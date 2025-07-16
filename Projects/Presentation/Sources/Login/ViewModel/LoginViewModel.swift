@@ -9,8 +9,8 @@ import Combine
 import Domain
 import Shared
 
-public final class LoginViewModel: ViewModel {
-    public enum Input {
+final class LoginViewModel: ViewModel {
+    enum Input {
         case kakaoLogin
         case appleLogin(nickname: String?, authToken: String)
         case toggleAgreement(termsType: TermsType)
@@ -18,20 +18,20 @@ public final class LoginViewModel: ViewModel {
         case submitAgreement
     }
 
-    public struct Output {
-        let loginResultPublisher: AnyPublisher<Bool, Never>
+    struct Output {
+        let loginResultPublisher: AnyPublisher<UserState?, Never>
         let agreementStatePublisher: AnyPublisher<TermsAgreementState, Never>
         let agreementResultPublisher: AnyPublisher<Bool, Never>
     }
 
     private(set) var output: Output
-    private let loginResultSubject = PassthroughSubject<Bool, Never>()
+    private let loginResultSubject = PassthroughSubject<UserState?, Never>()
     private let agreementStateSubject = CurrentValueSubject<TermsAgreementState, Never>(TermsAgreementState())
     private let agreementResultSubject = PassthroughSubject<Bool, Never>()
 
     private let loginUseCase: LoginUseCaseProtocol
     private var userInformation: (nickname: String?, token: String)?
-    public init(loginUseCase: LoginUseCaseProtocol) {
+    init(loginUseCase: LoginUseCaseProtocol) {
         self.loginUseCase = loginUseCase
         self.output = Output(
             loginResultPublisher: loginResultSubject.eraseToAnyPublisher(),
@@ -40,27 +40,27 @@ public final class LoginViewModel: ViewModel {
         )
     }
 
-    public func action(input: Input) {
+    func action(input: Input) {
         switch input {
         case .kakaoLogin:
             Task {
                 do {
-                    try await loginUseCase.kakaoLogin()
-                    loginResultSubject.send(true)
+                    let user = try await loginUseCase.kakaoLogin()
+                    loginResultSubject.send(user)
                 } catch {
                     BitnagilLogger.log(logType: .error, message: "\(error.localizedDescription)")
-                    loginResultSubject.send(false)
+                    loginResultSubject.send(nil)
                 }
             }
 
         case .appleLogin(let nickname, let authToken):
             Task {
                 do {
-                    try await loginUseCase.appleLogin(nickname: nickname, authToken: authToken)
-                    loginResultSubject.send(true)
+                    let user = try await loginUseCase.appleLogin(nickname: nickname, authToken: authToken)
+                    loginResultSubject.send(user)
                 } catch {
                     BitnagilLogger.log(logType: .error, message: "\(error.localizedDescription)")
-                    loginResultSubject.send(false)
+                    loginResultSubject.send(nil)
                 }
             }
 

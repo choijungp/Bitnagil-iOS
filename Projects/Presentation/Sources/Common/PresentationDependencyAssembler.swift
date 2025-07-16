@@ -23,14 +23,18 @@ public struct PresentationDependencyAssembler: DependencyAssemblerProtocol {
             return HomeViewModel()
         }
 
-        DIContainer.shared.register(type: OnboardingViewModel.self) { _ in
-            return OnboardingViewModel()
-        }
-
         DIContainer.shared.register(type: LoginViewModel.self) { container in
             guard let loginUseCase = container.resolve(type: LoginUseCaseProtocol.self)
-            else { return }
+            else { fatalError("loginUseCase 의존성이 등록되지 않았습니다.") }
+
             return LoginViewModel(loginUseCase: loginUseCase)
+        }
+
+        DIContainer.shared.register(type: OnboardingViewModel.self) { container in
+            guard let onboardingUseCase = container.resolve(type: OnboardingUseCaseProtocol.self)
+            else { fatalError("onboardingUseCase 의존성이 등록되지 않았습니다.") }
+
+            return OnboardingViewModel(onboardingUseCase: onboardingUseCase)
         }
     }
 }

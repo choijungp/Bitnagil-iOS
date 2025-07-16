@@ -1,5 +1,5 @@
 //
-//  RecommendedRoutineView.swift
+//  OnboardingRecommendedRoutineView.swift
 //  Presentation
 //
 //  Created by 최정인 on 7/11/25.
@@ -7,8 +7,10 @@
 
 import UIKit
 import Combine
+import Domain
+import Shared
 
-final class RecommendedRoutineView: BaseViewController<OnboardingViewModel> {
+final class OnboardingRecommendedRoutineView: BaseViewController<OnboardingViewModel> {
 
     private enum Layout {
         static let horizontalMargin: CGFloat = 20
@@ -19,7 +21,9 @@ final class RecommendedRoutineView: BaseViewController<OnboardingViewModel> {
         static let routineStackViewTopSpacing: CGFloat = 28
         static let routineButtonHeight: CGFloat = 84
         static let registerButtonHeight: CGFloat = 54
-        static let registerButtonBottomSpacing: CGFloat = 20
+        static let registerButtonBottomSpacing: CGFloat = 10
+        static let skipButtonHeight: CGFloat = 54
+        static let skipButtonBottomSpacing: CGFloat = 20
 
         static var mainLabelTopSpacing: CGFloat {
             let height = UIScreen.main.bounds.height
@@ -33,9 +37,11 @@ final class RecommendedRoutineView: BaseViewController<OnboardingViewModel> {
     private let recommendedRoutineStackView = UIStackView()
     private var recommendedRoutines: [Int: OnboardingChoiceButton] = [:]
     private let registerButton = PrimaryButton(buttonState: .disabled, buttonTitle: "등록하기")
+    private let skipButtonLabel = UILabel()
+    private let skipButton = UIButton()
     private var cancellables: Set<AnyCancellable>
 
-    public override init(viewModel: OnboardingViewModel) {
+    override init(viewModel: OnboardingViewModel) {
         cancellables = []
         super.init(viewModel: viewModel)
     }
@@ -44,19 +50,19 @@ final class RecommendedRoutineView: BaseViewController<OnboardingViewModel> {
         fatalError("init(coder:) has not been implemented")
     }
 
-    public override func viewDidLoad() {
+    override func viewDidLoad() {
         super.viewDidLoad()
-        viewModel.action(input: .fetchRecommendedRoutine)
     }
 
-    public override func viewWillAppear(_ animated: Bool) {
+    override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        viewModel.action(input: .registerOnboarding)
 
         let stepCount = OnboardingType.allCases.count + 1
         configureNavigationBar(navigationStyle: .withPrograssBarWithCustomBackButton(step: stepCount, stepCount: stepCount))
     }
 
-    public override func configureAttribute() {
+    override func configureAttribute() {
         mainLabel.do {
             let text = "당신만의 추천 루틴이\n생성되었어요!"
             $0.attributedText = BitnagilFont(style: .title2, weight: .bold).attributedString(text: text)
@@ -81,9 +87,23 @@ final class RecommendedRoutineView: BaseViewController<OnboardingViewModel> {
         registerButton.addAction(UIAction { [weak self] _ in
             self?.viewModel.action(input: .registerRecommendedRoutine)
         }, for: .touchUpInside)
+
+        skipButtonLabel.do {
+            $0.attributedText = BitnagilFont(
+                fontSize: 14,
+                lineHeight: 20,
+                underline: true,
+                weight: .regular
+            ).attributedString(text: "건너뛰기")
+            $0.textColor = BitnagilColor.navy500
+        }
+
+        skipButton.addAction(UIAction { [weak self] _ in
+            self?.goToHomeView()
+        }, for: .touchUpInside)
     }
 
-    public override func configureLayout() {
+    override func configureLayout() {
         let safeArea = view.safeAreaLayoutGuide
         view.backgroundColor = BitnagilColor.gray99
 
@@ -91,6 +111,8 @@ final class RecommendedRoutineView: BaseViewController<OnboardingViewModel> {
         view.addSubview(subLabel)
         view.addSubview(recommendedRoutineStackView)
         view.addSubview(registerButton)
+        skipButton.addSubview(skipButtonLabel)
+        view.addSubview(skipButton)
 
         mainLabel.snp.makeConstraints { make in
             make.leading.equalTo(safeArea).offset(Layout.horizontalMargin)
@@ -115,12 +137,23 @@ final class RecommendedRoutineView: BaseViewController<OnboardingViewModel> {
         registerButton.snp.makeConstraints { make in
             make.leading.equalTo(safeArea).offset(Layout.horizontalMargin)
             make.trailing.equalTo(safeArea).inset(Layout.horizontalMargin)
-            make.bottom.equalTo(safeArea).inset(Layout.registerButtonBottomSpacing)
+            make.bottom.equalTo(skipButton.snp.top).offset(-Layout.registerButtonBottomSpacing)
             make.height.equalTo(Layout.registerButtonHeight)
+        }
+
+        skipButtonLabel.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+        }
+
+        skipButton.snp.makeConstraints { make in
+            make.leading.equalTo(safeArea).offset(Layout.horizontalMargin)
+            make.trailing.equalTo(safeArea).inset(Layout.horizontalMargin)
+            make.bottom.equalTo(safeArea).inset(Layout.skipButtonBottomSpacing)
+            make.height.equalTo(Layout.skipButtonHeight)
         }
     }
 
-    public override func bind() {
+    override func bind() {
         viewModel.output.recommendedRoutinePublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] recommendedRoutines in
@@ -139,6 +172,18 @@ final class RecommendedRoutineView: BaseViewController<OnboardingViewModel> {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] canRegister in
                 self?.registerButton.updateButtonState(buttonState: canRegister ? .default : .disabled)
+            }
+            .store(in: &cancellables)
+
+        viewModel.output.registerRoutineResultPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] registerResult in
+                if registerResult {
+                    BitnagilLogger.log(logType: .debug, message: "추천 루틴 등록 완료")
+                    self?.goToHomeView()
+                } else {
+                    BitnagilLogger.log(logType: .error, message: "추천 루틴 등록 실패")
+                }
             }
             .store(in: &cancellables)
     }
@@ -174,5 +219,13 @@ final class RecommendedRoutineView: BaseViewController<OnboardingViewModel> {
                 routine.value.updateButtonState(isChecked: false)
             }
         }
+    }
+
+    private func goToHomeView() {
+        guard let homeViewModel = DIContainer.shared.resolve(type: HomeViewModel.self) else {
+            fatalError("homeViewModel 의존성이 등록되지 않았습니다.")
+        }
+        let homeView = HomeViewController(viewModel: homeViewModel)
+        self.navigationController?.pushViewController(homeView, animated: true)
     }
 }
