@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "chevron_right_icon@1x.png",
+      "filename" : "asterisk_icon@1x.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "chevron_right_icon@2x.png",
+      "filename" : "asterisk_icon@2x.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "chevron_right_icon@3x.png",
+      "filename" : "asterisk_icon@3x.png",
       "idiom" : "universal",
       "scale" : "3x"
     }
