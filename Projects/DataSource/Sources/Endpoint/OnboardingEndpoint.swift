@@ -8,8 +8,8 @@
 import Foundation
 
 enum OnboardingEndpoint {
-    case registerOnboarding(accessToken: String, choices: [String: String])
-    case registerRecommendedRoutine(accessToken: String, selectedRoutines: [Int])
+    case registerOnboarding(choices: [String: String])
+    case registerRecommendedRoutine(selectedRoutines: [Int])
 }
 
 extension OnboardingEndpoint: Endpoint {
@@ -29,18 +29,10 @@ extension OnboardingEndpoint: Endpoint {
     }
     
     var headers: [String : String] {
-        var headers: [String: String] = [
+        let headers: [String: String] = [
             "Content-Type": "application/json",
             "accept": "*/*"
         ]
-
-        switch self {
-        case .registerOnboarding(let accessToken, _):
-            headers["Authorization"] = "Bearer \(accessToken)"
-        case .registerRecommendedRoutine(let accessToken, _):
-            headers["Authorization"] = "Bearer \(accessToken)"
-        }
-
         return headers
     }
     
@@ -50,10 +42,14 @@ extension OnboardingEndpoint: Endpoint {
     
     var bodyParameters: [String : Any] {
         switch self {
-        case .registerOnboarding(_, let choices):
+        case .registerOnboarding(let choices):
             return choices
-        case .registerRecommendedRoutine(_, let selectedRoutines):
+        case .registerRecommendedRoutine(let selectedRoutines):
             return ["recommendedRoutineIds": selectedRoutines]
         }
+    }
+
+    var isAuthorized: Bool {
+        return true
     }
 }

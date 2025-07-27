@@ -12,29 +12,26 @@ import KakaoSDKUser
 import KakaoSDKAuth
 
 final class AuthRepository: AuthRepositoryProtocol {
-    private let networkService: NetworkServiceProtocol
-    private let keychainStorage: KeychainStorageProtocol
-    private let userDefaultsStorage: UserDefaultsStorageProtocol
+    private let networkService = NetworkService.shared
+    private let tokenManager = TokenManager.shared
+    private let userDefaultsStorage = UserDefaultsStorage.shared
 
-    init(
-        networkService: NetworkServiceProtocol,
-        keychainStorage: KeychainStorageProtocol,
-        userDefaultsStorage: UserDefaultsStorageProtocol
-    ) {
-        self.networkService = networkService
-        self.keychainStorage = keychainStorage
-        self.userDefaultsStorage = userDefaultsStorage
-    }
-
+    // 카카오 로그인을 진행합니다.
     func kakaoLogin() async throws -> UserEntity {
         let accessToken = try await fetchKakaoToken()
+        let (nickname, profileImageUrl) = try await fetchKakaoUserInfo()
         let user = try await requestServerLogin(
             socialType: .kakao,
             nickname: nil,
             token: accessToken)
+
+        try saveNickname(nickname: nickname)
+        try saveSocialLoginType(socialLoginType: .kakao)
+        try saveUserProfileImageUrl(profileImageUrl: profileImageUrl)
         return user
     }
 
+    // 애플 로그인을 진행합니다.
     func appleLogin(nickname: String?, authToken: String) async throws -> UserEntity {
         var savedNickname: String = ""
         if let nickname {
@@ -47,48 +44,33 @@ final class AuthRepository: AuthRepositoryProtocol {
             socialType: .apple,
             nickname: savedNickname,
             token: authToken)
+
+        try saveSocialLoginType(socialLoginType: .apple)
         return user
     }
 
+    // 이용 약관 동의를 진행합니다.
     func submitAgreement(agreements: [TermsType : Bool]) async throws {
-        let accessToken = try loadToken(tokenType: .accessToken)
-        let endpoint = AuthEndpoint.agreements(accessToken: accessToken, agreements: agreements)
+        let endpoint = AuthEndpoint.agreements(agreements: agreements)
         _ = try await networkService.request(endpoint: endpoint, type: EmptyResponseDTO.self)
     }
 
+    // 로그아웃을 진행합니다.
     func logout() async throws {
-        let accessToken = try loadToken(tokenType: .accessToken)
-        let endpoint = AuthEndpoint.logout(accessToken: accessToken)
+        let endpoint = AuthEndpoint.logout
         _ = try await networkService.request(endpoint: endpoint, type: String.self)
-        try removeToken()
+        try tokenManager.removeToken()
     }
 
+    // 탈퇴하기를 진행합니다.
     func withdraw() async throws {
-        let accessToken = try loadToken(tokenType: .accessToken)
-        let endpoint = AuthEndpoint.withdraw(accessToken: accessToken)
+        let endpoint = AuthEndpoint.withdraw
         _ = try await networkService.request(endpoint: endpoint, type: String.self)
-        try removeToken()
-        try removeNickname()
+        try tokenManager.removeToken()
+        try removeUserInfo()
     }
 
-    func reissueToken() async throws {
-        let refreshToken = try loadToken(tokenType: .refreshToken)
-        let endpoint = AuthEndpoint.reissue(refreshToken: refreshToken)
-
-        guard let userResponse = try await networkService.request(endpoint: endpoint, type: LoginResponseDTO.self)
-        else { return }
-        let userEntity = userResponse.toUserEntity()
-
-        guard
-            saveToken(tokenType: .accessToken, token: userEntity.accessToken),
-            saveToken(tokenType: .refreshToken, token: userEntity.refreshToken)
-        else { throw AuthError.tokenSaveFailed }
-
-        BitnagilLogger.log(logType: .debug, message: "User Logined: \(userEntity.userState)")
-        BitnagilLogger.log(logType: .debug, message: "AccessToken Saved: \(userEntity.accessToken)")
-        BitnagilLogger.log(logType: .debug, message: "RefreshToken Saved: \(userEntity.refreshToken)")
-    }
-
+    // 카카오 SDK를 통해 카카오 authToken을 받아옵니다.
     private func fetchKakaoToken() async throws -> String {
         try await withCheckedThrowingContinuation { continuation in
             let resultHandler: (OAuthToken?, Error?) -> Void = { oauthToken, error in
@@ -111,6 +93,26 @@ final class AuthRepository: AuthRepositoryProtocol {
         }
     }
 
+    // 카카오 SDK를 통해 유저의 정보(카카오 닉네임, 프로필 이미지)를 받아옵니다.
+    private func fetchKakaoUserInfo() async throws -> (nickname: String, profileImageUrl: URL) {
+        try await withCheckedThrowingContinuation { continuation in
+            let resultHandler: (User?, Error?) -> Void = { user, error in
+                if let error {
+                    continuation.resume(throwing: AuthError.unknown(error))
+                } else if
+                    let nickname = user?.kakaoAccount?.profile?.nickname,
+                    let profileImageUrl = user?.kakaoAccount?.profile?.profileImageUrl {
+                    continuation.resume(returning: (nickname, profileImageUrl))
+                } else {
+                    continuation.resume(throwing: AuthError.kakaoUserInformationFetchFailed)
+                }
+            }
+
+            UserApi.shared.me(completion: resultHandler)
+        }
+    }
+
+    // 서버 로그인을 진행합니다.
     private func requestServerLogin(
         socialType: SocialLoginType,
         nickname: String?,
@@ -125,10 +127,8 @@ final class AuthRepository: AuthRepositoryProtocol {
         else { throw AuthError.invalidUserData }
 
         let userEntity = userResponse.toUserEntity()
-        guard
-            saveToken(tokenType: .accessToken, token: userEntity.accessToken),
-            saveToken(tokenType: .refreshToken, token: userEntity.refreshToken)
-        else { throw AuthError.tokenSaveFailed }
+        try tokenManager.saveToken(token: userEntity.accessToken, tokenType: .accessToken)
+        try tokenManager.saveToken(token: userEntity.refreshToken, tokenType: .refreshToken)
 
         BitnagilLogger.log(logType: .debug, message: "User Logined: \(userEntity.userState)")
         BitnagilLogger.log(logType: .debug, message: "AccessToken Saved: \(userEntity.accessToken)")
@@ -137,41 +137,48 @@ final class AuthRepository: AuthRepositoryProtocol {
         return userEntity
     }
 
-    private func saveToken(tokenType: TokenType, token: String) -> Bool {
-        return keychainStorage.save(token, forKey: tokenType.rawValue)
-    }
-
-    private func loadToken(tokenType: TokenType) throws -> String {
-        guard let token = keychainStorage.load(forKey: tokenType.rawValue) else {
-            throw AuthError.tokenLoadFailed
-        }
-        return token
-    }
-
-    private func removeToken() throws {
-        guard
-            keychainStorage.remove(forKey: TokenType.accessToken.rawValue),
-            keychainStorage.remove(forKey: TokenType.refreshToken.rawValue)
-        else { throw AuthError.tokenRemoveFailed }
-    }
-
+    // UserDefaults에 닉네임을 저장합니다.
     private func saveNickname(nickname: String) throws {
         guard userDefaultsStorage.save(nickname, forKey: UserDefaultsKey.nickname.rawValue) else {
-            throw AuthError.nicknameSaveFailed
+            throw UserError.nicknameSaveFailed
         }
     }
 
+    // UserDefaults에 저장된 닉네임을 불러옵니다.
     private func loadNickname() throws -> String {
         let nickname: String? = userDefaultsStorage.load(forKey: UserDefaultsKey.nickname.rawValue)
         guard let nickname else {
-            throw AuthError.nicknameLoadFailed
+            throw UserError.nicknameLoadFailed
         }
         return nickname
     }
 
-    private func removeNickname() throws {
+    // UserDefaults에 소셜 로그인 타입을 저장합니다.
+    private func saveSocialLoginType(socialLoginType: SocialLoginType) throws {
+        guard userDefaultsStorage.save(socialLoginType.rawValue, forKey: UserDefaultsKey.socialLoginType.rawValue) else {
+            throw UserError.socialLoginTypeSaveFailed
+        }
+    }
+
+    // UserDefaults에 프로필 이미지를 저장합니다.
+    private func saveUserProfileImageUrl(profileImageUrl: URL) throws {
+        guard userDefaultsStorage.save(profileImageUrl.absoluteString, forKey: UserDefaultsKey.profileImageUrl.rawValue) else {
+            throw UserError.profileImageUrlSaveFailed
+        }
+    }
+
+    // UserDefaults에 저장된 유저 정보(닉네임, 소셜 로그인 타입, 프로필 이미지)를 삭제합니다.
+    private func removeUserInfo() throws {
         guard userDefaultsStorage.remove(forKey: UserDefaultsKey.nickname.rawValue) else {
-            throw AuthError.nicknameRemoveFailed
+            throw UserError.nicknameRemoveFailed
+        }
+
+        guard userDefaultsStorage.remove(forKey: UserDefaultsKey.socialLoginType.rawValue) else {
+            throw UserError.socialLoginTypeRemoveFailed
+        }
+
+        guard userDefaultsStorage.remove(forKey: UserDefaultsKey.profileImageUrl.rawValue) else {
+            throw UserError.profileImageUrlRemoveFailed
         }
     }
 }
