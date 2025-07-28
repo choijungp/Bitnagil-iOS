@@ -17,7 +17,7 @@ public struct PresentationDependencyAssembler: DependencyAssemblerProtocol {
 
     public func assemble() {
         preAssembler.assemble()
-        
+
         DIContainer.shared.register(type: HomeViewModel.self) { _ in
             return HomeViewModel()
         }
@@ -36,8 +36,11 @@ public struct PresentationDependencyAssembler: DependencyAssemblerProtocol {
             return OnboardingViewModel(onboardingUseCase: onboardingUseCase)
         }
 
-        DIContainer.shared.register(type: RecommendedRoutineViewModel.self) { _ in
-            return RecommendedRoutineViewModel()
+        DIContainer.shared.register(type: RecommendedRoutineViewModel.self) { container in
+            guard let recommendedRoutineUseCase = container.resolve(type: RecommendedRoutineUseCaseProtocol.self)
+            else { fatalError("recommendedRoutineUseCase 의존성이 등록되지 않았습니다.") }
+
+            return RecommendedRoutineViewModel(recommendedRoutineUseCase: recommendedRoutineUseCase)
         }
 
         DIContainer.shared.register(type: MypageViewModel.self) { container in
@@ -49,6 +52,10 @@ public struct PresentationDependencyAssembler: DependencyAssemblerProtocol {
 
         DIContainer.shared.register(type: EmotionRegisterViewModel.self) { _ in
             return EmotionRegisterViewModel()
+        }
+
+        DIContainer.shared.register(type: RoutineCreationViewModel.self) { _ in
+            return RoutineCreationViewModel()
         }
     }
 }
