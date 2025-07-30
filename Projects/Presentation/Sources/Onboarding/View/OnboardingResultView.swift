@@ -7,25 +7,24 @@
 
 import Combine
 import Domain
+import Shared
+import SnapKit
 import UIKit
 
 final class OnboardingResultView: BaseViewController<OnboardingViewModel> {
 
     private enum Layout {
         static let horizontalMargin: CGFloat = 20
+        static let mainLabelMinTopSpacing: CGFloat = 12
+        static let mainLabelMaxTopSpacing: CGFloat = 32
         static let mainLabelHeight: CGFloat = 60
         static let subLabelTopSpacing: CGFloat = 10
         static let subLabelHeight: CGFloat = 20
         static let resultStackViewTopSpacing: CGFloat = 4
         static let resultStackViewSpacing: CGFloat = 2
-        static let graphicTopSpacing: CGFloat = 36
-        static let graphicBotttomSpacing: CGFloat = 20
-
-        static var mainLabelTopSpacing: CGFloat {
-            let height = UIScreen.main.bounds.height
-            if height <= 667 { return 12 }
-            else { return 32 }
-        }
+        static let graphicTopSpacing: CGFloat = 80
+        static let graphicWidth: CGFloat = 306
+        static let graphicHeight: CGFloat = 290
     }
 
     private let mainLabel = UILabel()
@@ -34,10 +33,15 @@ final class OnboardingResultView: BaseViewController<OnboardingViewModel> {
     private var timeResultLabel = UILabel()
     private var feelingResultLabel = UILabel()
     private var outdoorResultLabel = UILabel()
-    private let graphicView = UIView()
-    private var cancellables: Set<AnyCancellable>
+    private let graphicView = UIImageView()
 
-    override init(viewModel: OnboardingViewModel) {
+    private var isLayoutConfigured: Bool = false
+    private var mainLabelTopConstraint: Constraint?
+
+    private let isFromMypage: Bool
+    private var cancellables: Set<AnyCancellable>
+    init(viewModel: OnboardingViewModel, isFromMypage: Bool = false) {
+        self.isFromMypage = isFromMypage
         cancellables = []
         super.init(viewModel: viewModel)
     }
@@ -54,12 +58,10 @@ final class OnboardingResultView: BaseViewController<OnboardingViewModel> {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
 
-        UIView.animate(withDuration: 0.5, delay: 3, options: .curveEaseInOut, animations: {
+        UIView.animate(withDuration: 0.5, delay: 2, options: .curveEaseInOut, animations: {
             self.view.alpha = 0.0
-        }, completion: { [weak self] finished in
-            guard let self else { return }
-            let recommendedRoutineView = OnboardingRecommendedRoutineView(viewModel: self.viewModel)
-            self.navigationController?.pushViewController(recommendedRoutineView, animated: true)
+        }, completion: { [weak self] finshed in
+            self?.viewModel.action(input: .fetchOnboardingChoices)
         })
     }
 
@@ -68,6 +70,22 @@ final class OnboardingResultView: BaseViewController<OnboardingViewModel> {
 
         let stepCount = OnboardingType.allCases.count + 1
         configureNavigationBar(navigationStyle: .withPrograssBar(step: stepCount, stepCount: stepCount))
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+
+        if !isLayoutConfigured {
+            updateMainLabelTopSpacing()
+            isLayoutConfigured = true
+        }
+    }
+
+    private func updateMainLabelTopSpacing() {
+        let height = view.bounds.height
+        let spacing: CGFloat = height <= 667 ? Layout.mainLabelMinTopSpacing : Layout.mainLabelMaxTopSpacing
+
+        mainLabelTopConstraint?.update(offset: spacing)
     }
 
     override func configureAttribute() {
@@ -88,7 +106,7 @@ final class OnboardingResultView: BaseViewController<OnboardingViewModel> {
             label.textColor = BitnagilColor.gray30
         }
 
-        graphicView.backgroundColor = BitnagilColor.gray90
+        graphicView.image = BitnagilGraphic.onboardingGraphic
     }
 
     override func configureLayout() {
@@ -106,7 +124,7 @@ final class OnboardingResultView: BaseViewController<OnboardingViewModel> {
         mainLabel.snp.makeConstraints { make in
             make.leading.equalTo(safeArea).offset(Layout.horizontalMargin)
             make.trailing.equalTo(safeArea).inset(Layout.horizontalMargin)
-            make.top.equalTo(safeArea).offset(Layout.mainLabelTopSpacing)
+            mainLabelTopConstraint = make.top.equalTo(safeArea).offset(Layout.mainLabelMinTopSpacing).constraint
             make.height.equalTo(Layout.mainLabelHeight)
         }
 
@@ -130,10 +148,10 @@ final class OnboardingResultView: BaseViewController<OnboardingViewModel> {
         }
 
         graphicView.snp.makeConstraints { make in
-            make.leading.equalTo(safeArea).offset(Layout.horizontalMargin)
-            make.trailing.equalTo(safeArea).inset(Layout.horizontalMargin)
             make.top.equalTo(resultStackView.snp.bottom).offset(Layout.graphicTopSpacing)
-            make.bottom.equalTo(safeArea).inset(Layout.graphicBotttomSpacing)
+            make.centerX.equalToSuperview()
+            make.width.equalTo(Layout.graphicWidth)
+            make.height.equalTo(Layout.graphicHeight)
         }
     }
 
@@ -142,6 +160,13 @@ final class OnboardingResultView: BaseViewController<OnboardingViewModel> {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] onboardingResults in
                 self?.updateResultLabels(results: onboardingResults)
+            }
+            .store(in: &cancellables)
+
+        viewModel.output.onboardingChoicesPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] onboardingChoices in
+                self?.goToResultRecommendedRoutineView(onboardingChoices: onboardingChoices)
             }
             .store(in: &cancellables)
     }
@@ -182,5 +207,20 @@ final class OnboardingResultView: BaseViewController<OnboardingViewModel> {
     private func updateOutdoorResultLabel(outdoorResult: String) {
         let baseText = "• \(outdoorResult)을 목표로 해볼게요!"
         outdoorResultLabel.attributedText = NSAttributedString.highlighted(text: baseText, highlightText: outdoorResult)
+    }
+
+    private func goToResultRecommendedRoutineView(onboardingChoices: [OnboardingChoiceType]) {
+        guard let resultRecommendedRoutineViewModel = DIContainer.shared.resolve(type: ResultRecommendedRoutineViewModel.self)
+        else{ fatalError("resultRecommendedRoutineViewModel 의존성이 등록되지 않았습니다.") }
+
+        var resultRecommendedView: ResultRecommendedRoutineView
+        if isFromMypage {
+            resultRecommendedRoutineViewModel.configure(viewModelType: .mypage(onboardingChoices: onboardingChoices))
+            resultRecommendedView = ResultRecommendedRoutineView(entryPoint: .mypage, viewModel: resultRecommendedRoutineViewModel)
+        } else {
+            resultRecommendedRoutineViewModel.configure(viewModelType: .onboarding(onboardingChoices: onboardingChoices))
+            resultRecommendedView = ResultRecommendedRoutineView(entryPoint: .onboarding, viewModel: resultRecommendedRoutineViewModel)
+        }
+        self.navigationController?.pushViewController(resultRecommendedView, animated: true)
     }
 }

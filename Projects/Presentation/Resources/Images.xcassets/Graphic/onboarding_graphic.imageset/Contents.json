@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "tired_orb.png",
+      "filename" : "onboarding_graphic.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "tired_orb@2x.png",
+      "filename" : "onboarding_graphic@2x.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "tired_orb@3x.png",
+      "filename" : "onboarding_graphic@3x.png",
       "idiom" : "universal",
       "scale" : "3x"
     }

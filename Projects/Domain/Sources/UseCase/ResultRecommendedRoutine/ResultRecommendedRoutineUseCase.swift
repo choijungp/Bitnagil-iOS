@@ -1,20 +1,28 @@
 //
-//  OnboardingUseCase.swift
+//  ResultRecommendedRoutineUseCase.swift
 //  Domain
 //
-//  Created by 최정인 on 7/15/25.
+//  Created by 최정인 on 7/29/25.
 //
 
-public final class OnboardingUseCase: OnboardingUseCaseProtocol {
-    private let onboardingRepository: OnboardingRepositoryProtocol
 
-    public init(onboardingRepository: OnboardingRepositoryProtocol) {
+public final class ResultRecommendedRoutineUseCase: ResultRecommendedRoutineUseCaseProtocol {
+    private let onboardingRepository: OnboardingRepositoryProtocol
+    private let emotionRepository: EmotionRepositoryProtocol
+
+    public init(onboardingRepository: OnboardingRepositoryProtocol, emotionRepository: EmotionRepositoryProtocol) {
         self.onboardingRepository = onboardingRepository
+        self.emotionRepository = emotionRepository
     }
 
-    public func registerOnboarding(onboardingChoices: [OnboardingChoiceType]) async throws -> [RecommendedRoutineEntity] {
+    public func fetchResultRecommendedRoutines(onboardingChoices: [OnboardingChoiceType]) async throws -> [RecommendedRoutineEntity] {
         let choices = convertToDictionary(onboardingChoices: onboardingChoices)
         let recommendedRoutines = try await onboardingRepository.registerOnboarding(onboardingChoices: choices)
+        return recommendedRoutines
+    }
+
+    public func fetchResultRecommendedRoutines(emotion: String) async throws -> [RecommendedRoutineEntity] {
+        let recommendedRoutines = try await emotionRepository.registerEmotion(emotion: emotion)
         return recommendedRoutines
     }
 

@@ -38,7 +38,7 @@ final class EmotionRegisterView: BaseViewController<EmotionRegisterViewModel> {
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         return collectionView
     }()
-
+    private var emotionList: [Emotion] = []
     private var cancellables: Set<AnyCancellable>
 
     override init(viewModel: EmotionRegisterViewModel) {
@@ -52,6 +52,7 @@ final class EmotionRegisterView: BaseViewController<EmotionRegisterViewModel> {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        viewModel.action(input: .fetchEmotions)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -106,14 +107,12 @@ final class EmotionRegisterView: BaseViewController<EmotionRegisterViewModel> {
     }
 
     override func bind() {
-        viewModel.output.registerEmotionResultPublisher
+        viewModel.output.emotionListPublisher
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] registerEmotionResult in
-                if registerEmotionResult {
-                    // TODO: 추천 루틴 화면 보여주기
-                    BitnagilLogger.log(logType: .error, message: "감정 등록 성공")
-                } else {
-                    BitnagilLogger.log(logType: .error, message: "감정 등록 실패")
+            .sink { [weak self] emotionList in
+                self?.emotionList = emotionList
+                if !emotionList.isEmpty {
+                    self?.emotionOrbCollectionView.reloadData()
                 }
             }
             .store(in: &cancellables)
@@ -123,22 +122,27 @@ final class EmotionRegisterView: BaseViewController<EmotionRegisterViewModel> {
 // MARK: UICollectionViewDelegate
 extension EmotionRegisterView: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let selectedEmotionType = EmotionType.allCases[indexPath.item]
-        viewModel.action(input: .selectEmotion(emotion: selectedEmotionType))
+        let selectedEmotion = emotionList[indexPath.item]
+        guard let resultRecommendedRoutineViewModel = DIContainer.shared.resolve(type: ResultRecommendedRoutineViewModel.self)
+        else { fatalError("resultRecommendedRoutineViewModel 의존성이 등록되지 않았습니다.") }
+        resultRecommendedRoutineViewModel.configure(viewModelType: .emotion(emotion: selectedEmotion))
+
+        let resultRecommendedRoutineView = ResultRecommendedRoutineView(entryPoint: .emotion, viewModel: resultRecommendedRoutineViewModel)
+        self.navigationController?.pushViewController(resultRecommendedRoutineView, animated: true)
     }
 }
 
 // MARK: UICollectionViewDataSource
 extension EmotionRegisterView: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return EmotionType.allCases.count
+        return emotionList.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: EmotionOrbCollectionViewCell.className, for: indexPath) as? EmotionOrbCollectionViewCell
         else { return UICollectionViewCell() }
 
-        let emotion = EmotionType.allCases[indexPath.item]
+        let emotion = emotionList[indexPath.item]
         cell.configureCell(emotion: emotion)
         return cell
     }
