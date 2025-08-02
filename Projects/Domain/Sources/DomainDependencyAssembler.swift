@@ -52,5 +52,19 @@ public struct DomainDependencyAssembler: DependencyAssemblerProtocol {
 
             return ResultRecommendedRoutineUseCase(onboardingRepository: onboardingRepository, emotionRepository: emotionRepository)
         }
+
+        DIContainer.shared.register(type: UserDataUseCaseProtocol.self) { container in
+            guard let userDataRepository = container.resolve(type: UserDataRepositoryProtocol.self)
+            else { fatalError("userDataRepository 의존성이 등록되지 않았습니다.") }
+
+            return UserDataUseCase(userDataRepository: userDataRepository)
+        }
+
+        DIContainer.shared.register(type: RoutineUseCaseProtocol.self) { container in
+            guard let routineRepository = container.resolve(type: RoutineRepositoryProtocol.self)
+            else { fatalError("routineRepository 의존성이 등록되지 않았습니다.") }
+
+            return RoutineUseCase(routineRepository: routineRepository)
+        }
     }
 }

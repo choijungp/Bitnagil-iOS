@@ -5,6 +5,7 @@
 //  Created by 최정인 on 7/18/25.
 //
 
+import SnapKit
 import UIKit
 
 protocol RoutineViewDelegate: AnyObject {
@@ -37,7 +38,7 @@ final class RoutineView: UIView {
     private lazy var mainRoutineView = MainRoutineView(mainRoutine: routine)
     private let subRoutineLabel = UILabel()
     private let subRoutineStackView = UIStackView()
-    private var subRoutineButtons: [Int: SubRoutineButton] = [:]
+    private var subRoutineButtons: [String: SubRoutineButton] = [:]
 
     private var routine: MainRoutine
     weak var delegate: RoutineViewDelegate?
@@ -65,7 +66,7 @@ final class RoutineView: UIView {
     }
 
     private func configureAttribute() {
-        timeLabel.text = "\(routine.startTime.convertToString(dateType: .amPmTime))부터 시작"
+        timeLabel.text = "\(routine.startTime.convertToString(dateType: .amPmTimeShort))부터 시작"
         timeLabel.font = BitnagilFont(style: .caption1, weight: .regular).font
         timeLabel.textColor = BitnagilColor.navy300
 
@@ -142,6 +143,7 @@ final class RoutineView: UIView {
             }, for: .touchUpInside)
             subRoutineStackView.addArrangedSubview(subRoutineView)
             subRoutineView.snp.makeConstraints { make in
+                make.horizontalEdges.equalToSuperview()
                 make.height.equalTo(Layout.subRoutineViewHeight)
             }
         }

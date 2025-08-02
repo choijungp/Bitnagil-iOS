@@ -6,6 +6,7 @@
 //
 
 import Combine
+import Kingfisher
 import Shared
 import SnapKit
 import UIKit
@@ -23,9 +24,9 @@ final class HomeView: BaseViewController<HomeViewModel> {
         static let registerEmotionButtonTopSpacing: CGFloat = 3
         static let registerEmotionButtonHeight: CGFloat = 44
         static let registerEmotionButtonWidth: CGFloat = 136
-        static let emotionOrbViewTopSpacing: CGFloat = 81
+        static let emotionOrbViewTopSpacing: CGFloat = 46
         static let emotionOrbViewTrailingSpacing: CGFloat = 35
-        static let emotionOrbViewSize: CGFloat = 102
+        static let emotionOrbViewSize: CGFloat = 172
         static let contentViewCornerRadius: CGFloat = 20
         static let weekViewHeight: CGFloat = 127
         static let routineSortButtonTrailingSpacing: CGFloat = 8
@@ -37,12 +38,24 @@ final class HomeView: BaseViewController<HomeViewModel> {
         static let emptyViewHeight: CGFloat = 120
         static let collapsedTop: CGFloat = 225
         static let expandedTop: CGFloat = 40
+        static let floatingButtonBottomSpacing: CGFloat = 19
+        static let floatingButtonSize: CGFloat = 52
+        static let floatingMenuBottomSpacing: CGFloat = 15
+        static let floatingMenuHeight: CGFloat = 64
+        static let floatingMenuWidth: CGFloat = 144
+        static let tooltipViewTailLeadingSpacing: CGFloat = 78.68
+        static let tooltipViewLeadingSpacing: CGFloat = 76
+        static let tooltipViewBottomSpacing: CGFloat = 4
+        static let tooltipViewWidth: CGFloat = 176
+        static let tooltipViewHeight: CGFloat = 47
+        static let routineDetailViewDefaultHeight: CGFloat = 367
+        static let routineDetailViewSubRoutineHeight: CGFloat = 25
     }
 
     private let gradientLayer = CAGradientLayer()
     private let homeLabel = UILabel()
     private let informationButton = UIButton()
-    private let emotionOrbView = UIView()
+    private let emotionOrbView = UIImageView()
     private let registerEmotionButton = HomeRegisterEmotionButton()
 
     private let contentView = UIView()
@@ -53,6 +66,14 @@ final class HomeView: BaseViewController<HomeViewModel> {
     private let routineSortButton = UIButton()
     private let routineSortView = SelectableItemTableView<RoutineSortType>(items: [RoutineSortType.complete, RoutineSortType.incomplete])
     private let routineStackView = UIStackView()
+
+    private let tooltipView = TooltipView(tailPosition: .offsetFromLeading(Layout.tooltipViewTailLeadingSpacing))
+
+    private var isShowingFloatingMenu: Bool = false
+    private let dimmedView = UIView()
+    private let floatingButton = FloatingButton()
+    private let floatingMenu = FloatingMenuView()
+    private var bottomSheet: CustomBottomSheet?
 
     private var contentViewTopConstraint: Constraint?
     private var cancellables: Set<AnyCancellable>
@@ -72,7 +93,11 @@ final class HomeView: BaseViewController<HomeViewModel> {
         configureGradientBackground()
         viewModel.action(input: .loadNickname)
         viewModel.action(input: .fetchRoutines)
-        viewModel.action(input: .fetchDailyRoutines(date: Date()))
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        viewModel.action(input: .fetchEmotion)
     }
 
     override func viewDidLayoutSubviews() {
@@ -87,13 +112,14 @@ final class HomeView: BaseViewController<HomeViewModel> {
         homeLabel.textColor = BitnagilColor.gray10
 
         informationButton.setImage(BitnagilIcon.informationIcon, for: .normal)
-        informationButton.addAction(UIAction { _ in
-            // TODO: 툴팁 뷰를 보여줘야 합니다.
+        informationButton.addAction(UIAction { [weak self] _ in
+            self?.informationButton.isSelected.toggle()
+            if self?.informationButton.isSelected ?? false {
+                self?.tooltipView.showTooltip()
+            } else {
+                self?.tooltipView.hideTooltip()
+            }
         }, for: .touchUpInside)
-
-        emotionOrbView.backgroundColor = BitnagilColor.happy
-        emotionOrbView.layer.masksToBounds = true
-        emotionOrbView.layer.cornerRadius = Layout.emotionOrbViewSize / 2
 
         registerEmotionButton.addAction(UIAction { [weak self] _ in
             guard let emotionRegisterViewModel = DIContainer.shared.resolve(type: EmotionRegisterViewModel.self) else {
@@ -116,7 +142,12 @@ final class HomeView: BaseViewController<HomeViewModel> {
         weekView.delegate = self
 
         emptyView.didTapRegisterRoutineButton = {
-            // TODO: 감정 등록 화면으로 이동해야 합니다.
+            guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self) else {
+                fatalError("routineCreationViewModel 의존성이 등록되지 않았습니다.")
+            }
+            let routineCreationView = RoutineCreationView(viewModel: routineCreationViewModel)
+            routineCreationView.hidesBottomBarWhenPushed = true
+            self.navigationController?.pushViewController(routineCreationView, animated: true)
         }
 
         routineScrollView.showsVerticalScrollIndicator = false
@@ -133,6 +164,25 @@ final class HomeView: BaseViewController<HomeViewModel> {
         routineStackView.spacing = Layout.routineStackViewSpacing
         routineStackView.alignment = .fill
         routineStackView.distribution = .fill
+
+        tooltipView.configure(message: "감정 기록 시, 루틴을 추천 받아요!")
+        tooltipView.isHidden = true
+        let viewTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        view.addGestureRecognizer(viewTapGesture)
+
+        floatingButton.addAction(UIAction { [weak self] _ in
+            self?.toggleFloatingButton()
+        }, for: .touchUpInside)
+
+        floatingMenu.isHidden = true
+        floatingMenu.delegate = self
+
+        dimmedView.isHidden = true
+        dimmedView.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        dimmedView.alpha = 0
+
+        let dimmedViewTapGesture = UITapGestureRecognizer(target: self, action: #selector(tappedDimmedView))
+        dimmedView.addGestureRecognizer(dimmedViewTapGesture)
     }
 
     override func configureLayout() {
@@ -141,6 +191,7 @@ final class HomeView: BaseViewController<HomeViewModel> {
 
         view.addSubview(homeLabel)
         view.addSubview(informationButton)
+        view.addSubview(tooltipView)
         view.addSubview(emotionOrbView)
         view.addSubview(registerEmotionButton)
 
@@ -150,6 +201,10 @@ final class HomeView: BaseViewController<HomeViewModel> {
         contentView.addSubview(routineScrollView)
         routineScrollView.addSubview(routineSortButton)
         routineScrollView.addSubview(routineStackView)
+
+        view.addSubview(dimmedView)
+        view.addSubview(floatingMenu)
+        view.addSubview(floatingButton)
 
         homeLabel.snp.makeConstraints { make in
             make.top.equalTo(safeArea).offset(Layout.homeLabelTopSpacing)
@@ -163,6 +218,13 @@ final class HomeView: BaseViewController<HomeViewModel> {
             make.size.equalTo(Layout.informationButtonSize)
         }
 
+        tooltipView.snp.makeConstraints { make in
+            make.leading.equalTo(informationButton).offset(-Layout.tooltipViewLeadingSpacing)
+            make.bottom.equalTo(informationButton.snp.top).offset(-Layout.tooltipViewBottomSpacing)
+            make.width.equalTo(Layout.tooltipViewWidth)
+            make.height.equalTo(Layout.tooltipViewHeight)
+        }
+
         registerEmotionButton.snp.makeConstraints { make in
             make.leading.equalToSuperview()
             make.top.equalTo(homeLabel.snp.bottom).offset(Layout.registerEmotionButtonTopSpacing)
@@ -172,7 +234,7 @@ final class HomeView: BaseViewController<HomeViewModel> {
 
         emotionOrbView.snp.makeConstraints { make in
             make.top.equalTo(safeArea).offset(Layout.emotionOrbViewTopSpacing)
-            make.trailing.equalToSuperview().inset(Layout.emotionOrbViewTrailingSpacing)
+            make.trailing.equalToSuperview()
             make.size.equalTo(Layout.emotionOrbViewSize)
         }
 
@@ -213,6 +275,23 @@ final class HomeView: BaseViewController<HomeViewModel> {
             make.centerX.equalToSuperview()
             make.height.equalTo(Layout.emptyViewHeight)
         }
+
+        floatingButton.snp.makeConstraints { make in
+            make.trailing.equalTo(safeArea).inset(Layout.horizontalMargin)
+            make.bottom.equalTo(safeArea).inset(Layout.floatingButtonBottomSpacing)
+            make.size.equalTo(Layout.floatingButtonSize)
+        }
+
+        floatingMenu.snp.makeConstraints { make in
+            make.trailing.equalTo(safeArea).inset(Layout.horizontalMargin)
+            make.bottom.equalTo(floatingButton.snp.top).offset(-Layout.floatingMenuBottomSpacing)
+            make.height.equalTo(Layout.floatingMenuHeight)
+            make.width.equalTo(Layout.floatingMenuWidth)
+        }
+
+        dimmedView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
     }
 
     override func bind() {
@@ -223,12 +302,29 @@ final class HomeView: BaseViewController<HomeViewModel> {
             }
             .store(in: &cancellables)
 
+        viewModel.output.fetchRoutineResultPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] fetchRoutineResult in
+                if fetchRoutineResult {
+                    self?.viewModel.action(input: .fetchDailyRoutines(date: Date()))
+                }
+            }
+            .store(in: &cancellables)
+
         viewModel.output.routinesPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] routines in
                 self?.updateRoutineView(routines: routines)
             }
             .store(in: &cancellables)
+
+        viewModel.output.emotionPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] emotion in
+                self?.updateEmotionOrbView(emotion: emotion)
+            }
+            .store(in: &cancellables)
+
     }
 
     // 홈 Graident 배경색을 설정합니다.
@@ -243,6 +339,9 @@ final class HomeView: BaseViewController<HomeViewModel> {
 
     // 루틴 정렬 Bottom Sheet를 보여줍니다.
     private func showRoutineSortBottomSheet() {
+        if !tooltipView.isHidden {
+            hideTooltipView()
+        }
         presentCustomBottomSheet(contentViewController: routineSortView, maxHeight: 192)
     }
 
@@ -267,6 +366,19 @@ final class HomeView: BaseViewController<HomeViewModel> {
                 routineStackView.addArrangedSubview(routineView)
             }
         }
+    }
+
+    // 감정 구슬 View를 업데이트 합니다.
+    private func updateEmotionOrbView(emotion: Emotion?) {
+        guard
+            let emotion,
+            let emotionOrbImageUrl = emotion.emotionImageUrl else {
+            emotionOrbView.image = BitnagilGraphic.defaultEmotionGraphic
+            return
+        }
+        emotionOrbView.kf.setImage(with: emotionOrbImageUrl)
+        registerEmotionButton.isEnabled = false
+        // TODO: 토스트뷰 보여주기
     }
 
     @objc private func handlePanGesture(_ gesture: UIPanGestureRecognizer) {
@@ -310,6 +422,47 @@ final class HomeView: BaseViewController<HomeViewModel> {
             self.view.layoutIfNeeded()
         }
     }
+
+    private func toggleFloatingButton() {
+        if !tooltipView.isHidden {
+            hideTooltipView()
+        }
+
+        floatingButton.toggle()
+        isShowingFloatingMenu.toggle()
+
+        floatingMenu.isHidden = !isShowingFloatingMenu
+        dimmedView.isHidden = !isShowingFloatingMenu
+
+        UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut]) {
+            self.dimmedView.alpha = self.isShowingFloatingMenu ? 1 : 0
+            self.floatingMenu.alpha = self.isShowingFloatingMenu ? 1 : 0
+        }
+    }
+
+    @objc private func tappedDimmedView() {
+        toggleFloatingButton()
+    }
+
+    @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
+        let location = gesture.location(in: view)
+
+        // 탭한 곳이 버튼 영역인 경우
+        if informationButton.frame.contains(location) {
+            hideTooltipView()
+            return
+        }
+
+        // 탭한 곳이 tooltip 영역 밖인 경우
+        if !tooltipView.frame.contains(location) {
+            hideTooltipView()
+        }
+    }
+
+    private func hideTooltipView() {
+        informationButton.isSelected = false
+        tooltipView.hideTooltip()
+    }
 }
 
 // MARK: RoutineViewDelegate
@@ -320,7 +473,13 @@ extension HomeView: RoutineViewDelegate {
     }
 
     func routineView(_ sender: RoutineView, didTapMainRoutineMoreButton mainRoutine: MainRoutine) {
-        // TODO: 더보기 Bottom Sheet
+        let maxHeight = Layout.routineDetailViewDefaultHeight + CGFloat(mainRoutine.subRoutines.count - 1) * Layout.routineDetailViewSubRoutineHeight
+        let routineDetailView = RoutineDetailView(routine: mainRoutine)
+        routineDetailView.delegate = self
+        bottomSheet = CustomBottomSheet(contentViewController: routineDetailView, maxHeight: maxHeight)
+        if let bottomSheet {
+            present(bottomSheet, animated: true)
+        }
     }
 
     func routineView(_ sender: RoutineView, didTapSubRoutineCheckButton subRoutine: SubRoutine) {
@@ -339,10 +498,43 @@ extension HomeView: SelectableItemTableViewDelegate {
 // MARK: WeekViewDelegate
 extension HomeView: WeekViewDelegate {
     func weekView(_ sender: WeekView, didMoveWeek weekStartDate: Date) {
-        // TODO: 그 전 주 혹은 다음 주 데이터 받아와야 합니다.
+        viewModel.action(input: .fetchDailyRoutines(date: weekStartDate))
     }
     
     func weekView(_ sender: WeekView, didSelectDate date: Date) {
         viewModel.action(input: .fetchDailyRoutines(date: date))
+    }
+}
+
+// MARK: FloatingMenuViewDelegate
+extension HomeView: FloatingMenuViewDelegate {
+    func floatingMenuDidTapRegisterRoutineButton(_ sender: FloatingMenuView) {
+        toggleFloatingButton()
+        guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self) else {
+            fatalError("routineCreationViewModel 의존성이 등록되지 않았습니다.")
+        }
+        let routineCreationView = RoutineCreationView(viewModel: routineCreationViewModel)
+        routineCreationView.hidesBottomBarWhenPushed = true
+        self.navigationController?.pushViewController(routineCreationView, animated: true)
+    }
+}
+
+// MARK: RoutineDetailViewDelegate
+extension HomeView: RoutineDetailViewDelegate {
+    func routineDetailView(_ sender: RoutineDetailView, didEditRoutine routine: MainRoutine) {
+        if let bottomSheet {
+            bottomSheet.dismissBottomSheet()
+            self.bottomSheet = nil
+        }
+        guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self) else {
+            fatalError("routineCreationViewModel 의존성이 등록되지 않았습니다.")
+        }
+        let routineCreationView = RoutineCreationView(viewModel: routineCreationViewModel)
+        routineCreationView.hidesBottomBarWhenPushed = true
+        self.navigationController?.pushViewController(routineCreationView, animated: true)
+    }
+    
+    func routineDetailView(_ sender: RoutineDetailView, didDeleteRoutine routine: MainRoutine) {
+        // TODO: 루틴 삭제
     }
 }

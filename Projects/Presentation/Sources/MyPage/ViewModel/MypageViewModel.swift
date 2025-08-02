@@ -38,11 +38,13 @@ final class MypageViewModel: ViewModel {
             nickNamePublisher: nicknamePublisher.eraseToAnyPublisher(),
             externalURLPublisher: externalURLPublisher.eraseToAnyPublisher())
 
-        do {
-            let nickname = try userDataRepository.loadNickname()
-            nicknamePublisher.send(nickname)
-        } catch {
-            BitnagilLogger.log(logType: .debug, message: "\(error.localizedDescription)")
+        Task {
+            do {
+                let nickname = try await userDataRepository.loadNickname()
+                nicknamePublisher.send(nickname)
+            } catch {
+                BitnagilLogger.log(logType: .debug, message: "\(error.localizedDescription)")
+            }
         }
     }
 
@@ -58,11 +60,11 @@ final class MypageViewModel: ViewModel {
         case .resetGoal:
             break
         case .notice: // 임시 url
-            if let url = URL(string: "https://www.google.com") {
+            if let url = URL(string: "https://complex-wombat-99f.notion.site/23ff4587491d80efa0a5e4baece6017b") {
                 externalURLPublisher.send(url)
             }
         case .faq: // 임시 url
-            if let url = URL(string: "https://www.naver.com") {
+            if let url = URL(string: "https://complex-wombat-99f.notion.site/23ff4587491d80659ae3ea392afbc05e") {
                 externalURLPublisher.send(url)
             }
         }

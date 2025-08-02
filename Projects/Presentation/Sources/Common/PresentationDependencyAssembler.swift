@@ -18,8 +18,20 @@ public struct PresentationDependencyAssembler: DependencyAssemblerProtocol {
     public func assemble() {
         preAssembler.assemble()
 
-        DIContainer.shared.register(type: HomeViewModel.self) { _ in
-            return HomeViewModel()
+        DIContainer.shared.register(type: HomeViewModel.self) { container in
+            guard let userDataUseCase = container.resolve(type: UserDataUseCaseProtocol.self)
+            else { fatalError("userDataUseCase 의존성이 등록되지 않았습니다.") }
+
+            guard let routineUseCase = container.resolve(type: RoutineUseCaseProtocol.self)
+            else { fatalError("routineUseCase 의존성이 등록되지 않았습니다.") }
+
+            guard let emotionUseCase = container.resolve(type: EmotionUseCaseProtocol.self)
+            else { fatalError("emotionUseCase 의존성이 등록되지 않았습니다.") }
+
+            return HomeViewModel(
+                routineUseCase: routineUseCase,
+                userDataUseCase: userDataUseCase,
+                emotionUseCase: emotionUseCase)
         }
 
         DIContainer.shared.register(type: LoginViewModel.self) { container in
