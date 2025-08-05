@@ -50,6 +50,8 @@ final class HomeView: BaseViewController<HomeViewModel> {
         static let tooltipViewHeight: CGFloat = 47
         static let routineDetailViewDefaultHeight: CGFloat = 367
         static let routineDetailViewSubRoutineHeight: CGFloat = 25
+        static let deleteAlertViewWidth: CGFloat = 298
+        static let deleteAlertViewHeight: CGFloat = 214
     }
 
     private let gradientLayer = CAGradientLayer()
@@ -74,6 +76,9 @@ final class HomeView: BaseViewController<HomeViewModel> {
     private let floatingButton = FloatingButton()
     private let floatingMenu = FloatingMenuView()
     private var bottomSheet: CustomBottomSheet?
+
+    private var isShowingDeleteAlertView: Bool = false
+    private let deleteAlertView = RoutineDeleteAlertView()
 
     private var contentViewTopConstraint: Constraint?
     private var cancellables: Set<AnyCancellable>
@@ -183,6 +188,9 @@ final class HomeView: BaseViewController<HomeViewModel> {
 
         let dimmedViewTapGesture = UITapGestureRecognizer(target: self, action: #selector(tappedDimmedView))
         dimmedView.addGestureRecognizer(dimmedViewTapGesture)
+
+        deleteAlertView.delegate = self
+        deleteAlertView.isHidden = true
     }
 
     override func configureLayout() {
@@ -205,6 +213,8 @@ final class HomeView: BaseViewController<HomeViewModel> {
         view.addSubview(dimmedView)
         view.addSubview(floatingMenu)
         view.addSubview(floatingButton)
+
+        view.addSubview(deleteAlertView)
 
         homeLabel.snp.makeConstraints { make in
             make.top.equalTo(safeArea).offset(Layout.homeLabelTopSpacing)
@@ -292,6 +302,12 @@ final class HomeView: BaseViewController<HomeViewModel> {
         dimmedView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
+
+        deleteAlertView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.width.equalTo(Layout.deleteAlertViewWidth)
+            make.height.equalTo(Layout.deleteAlertViewHeight)
+        }
     }
 
     override func bind() {
@@ -325,6 +341,18 @@ final class HomeView: BaseViewController<HomeViewModel> {
             }
             .store(in: &cancellables)
 
+        viewModel.output.deleteRoutineResultPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isDeleteRoutine in
+                guard let self else { return }
+                if isDeleteRoutine {
+                    if self.isShowingDeleteAlertView {
+                        self.toggleDeleteAlertView()
+                    }
+                    viewModel.action(input: .fetchRoutines)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     // 홈 Graident 배경색을 설정합니다.
@@ -440,8 +468,30 @@ final class HomeView: BaseViewController<HomeViewModel> {
         }
     }
 
+    private func toggleDeleteAlertView() {
+        isShowingDeleteAlertView.toggle()
+
+        deleteAlertView.isHidden = !isShowingDeleteAlertView
+        dimmedView.isHidden = !isShowingDeleteAlertView
+
+        if !isShowingDeleteAlertView {
+            viewModel.action(input: .selectRoutine(routine: nil))
+        }
+
+        UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut]) {
+            self.dimmedView.alpha = self.isShowingDeleteAlertView ? 1 : 0
+            self.deleteAlertView.alpha = self.isShowingDeleteAlertView ? 1 : 0
+        }
+    }
+
     @objc private func tappedDimmedView() {
-        toggleFloatingButton()
+        if isShowingFloatingMenu {
+            toggleFloatingButton()
+        }
+
+        if isShowingDeleteAlertView {
+            toggleDeleteAlertView()
+        }
     }
 
     @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
@@ -479,6 +529,7 @@ extension HomeView: RoutineViewDelegate {
         bottomSheet = CustomBottomSheet(contentViewController: routineDetailView, maxHeight: maxHeight)
         if let bottomSheet {
             present(bottomSheet, animated: true)
+            viewModel.action(input: .selectRoutine(routine: mainRoutine))
         }
     }
 
@@ -535,6 +586,26 @@ extension HomeView: RoutineDetailViewDelegate {
     }
     
     func routineDetailView(_ sender: RoutineDetailView, didDeleteRoutine routine: MainRoutine) {
-        // TODO: 루틴 삭제
+        if let bottomSheet {
+            bottomSheet.dismissBottomSheet()
+            self.bottomSheet = nil
+        }
+
+        if routine.repeatDay.isEmpty {
+            viewModel.action(input: .deleteDailyRoutine)
+        } else {
+            toggleDeleteAlertView()
+        }
+    }
+}
+
+// MARK: RoutineDeleteAlertViewDelegate
+extension HomeView: RoutineDeleteAlertViewDelegate {
+    func routineDeleteAlertViewDidTapDeleteAllRoutine(_ sender: RoutineDeleteAlertView) {
+        viewModel.action(input: .deleteAllRoutine)
+    }
+    
+    func routineDeleteAlertViewDidTapDeleteDailyRoutine(_ sender: RoutineDeleteAlertView) {
+        viewModel.action(input: .deleteDailyRoutine)
     }
 }

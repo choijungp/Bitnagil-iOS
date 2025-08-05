@@ -62,4 +62,26 @@ final class RoutineRepository: RoutineRepositoryProtocol {
 
         _ = try await networkService.request(endpoint: endpoint, type: EmptyResponseDTO.self)
     }
+
+    func deleteAllRoutine(routineId: String) async throws {
+        let endpoint = RoutineEndpoint.deleteAllRoutine(routineId: routineId)
+        _ = try await networkService.request(endpoint: endpoint, type: EmptyResponseDTO.self)
+    }
+
+    func deleteDailyRoutine(routine: DeleteRoutineEntity) async throws {
+        let deleteSubRoutineDTO = routine
+            .subRoutineInfosForDelete
+            .map({ DeleteSubRoutineDTO(subRoutineId: $0.subRoutineId, routineCompletionId: $0.routineCompletionId) })
+
+        let deleteRoutineDTO = DeleteRoutineDTO(
+            routineId: routine.routineId,
+            routineCompletionId: routine.routineCompletionId,
+            historySeq: routine.historySeq,
+            routineType: routine.routineType,
+            performedDate: routine.performedDate,
+            subRoutineInfosForDelete: deleteSubRoutineDTO)
+
+        let endpoint = RoutineEndpoint.deleteDailyRoutine(routine: deleteRoutineDTO)
+        _ = try await networkService.request(endpoint: endpoint, type: EmptyResponseDTO.self)
+    }
 }

@@ -15,6 +15,9 @@ final class HomeViewModel: ViewModel {
         case fetchRoutines
         case fetchDailyRoutines(date: Date)
         case fetchEmotion
+        case selectRoutine(routine: MainRoutine?)
+        case deleteDailyRoutine
+        case deleteAllRoutine
     }
 
     struct Output {
@@ -22,6 +25,7 @@ final class HomeViewModel: ViewModel {
         let fetchRoutineResultPublisher: AnyPublisher<Bool, Never>
         let routinesPublisher: AnyPublisher<[MainRoutine], Never>
         let emotionPublisher: AnyPublisher<Emotion?, Never>
+        let deleteRoutineResultPublisher: AnyPublisher<Bool, Never>
     }
 
     private(set) var output: Output
@@ -29,7 +33,9 @@ final class HomeViewModel: ViewModel {
     private let nicknameSubject = CurrentValueSubject<String, Never>("")
     private let fetchRoutineResultSubject = PassthroughSubject<Bool, Never>()
     private let routinesSubject = CurrentValueSubject<[MainRoutine], Never>([])
+    private let selectedRoutineSubject = CurrentValueSubject<MainRoutine?, Never>(nil)
     private let emotionSubject = CurrentValueSubject<Emotion?, Never>(nil)
+    private let deleteRoutineResultSubject = PassthroughSubject<Bool, Never>()
 
     private let calendar = Calendar.current
     private let today = Date()
@@ -51,7 +57,8 @@ final class HomeViewModel: ViewModel {
             nicknamePublisher: nicknameSubject.eraseToAnyPublisher(),
             fetchRoutineResultPublisher: fetchRoutineResultSubject.eraseToAnyPublisher(),
             routinesPublisher: routinesSubject.eraseToAnyPublisher(),
-            emotionPublisher: emotionSubject.eraseToAnyPublisher()
+            emotionPublisher: emotionSubject.eraseToAnyPublisher(),
+            deleteRoutineResultPublisher: deleteRoutineResultSubject.eraseToAnyPublisher()
         )
     }
 
@@ -68,6 +75,15 @@ final class HomeViewModel: ViewModel {
 
         case .fetchEmotion:
             fetchEmotion()
+
+        case .selectRoutine(let routine):
+            selectedRoutineSubject.send(routine)
+
+        case .deleteDailyRoutine:
+            deleteDailyRoutine()
+
+        case .deleteAllRoutine:
+            deleteAllRoutine()
         }
     }
 
@@ -140,5 +156,44 @@ final class HomeViewModel: ViewModel {
     private func calculateDate(for date: Date, offset week: Int) -> Date {
         let endDate = calendar.date(byAdding: .weekOfYear, value: week, to: date) ?? date
         return endDate
+    }
+
+    private func deleteAllRoutine() {
+        guard let routineId = selectedRoutineSubject.value?.id
+        else { return }
+
+        Task {
+            do {
+                try await routineUseCase.deleteAllRoutine(routineId: routineId)
+                selectedRoutineSubject.send(nil)
+                deleteRoutineResultSubject.send(true)
+            } catch {
+                deleteRoutineResultSubject.send(false)
+            }
+        }
+    }
+
+    private func deleteDailyRoutine() {
+        guard let routine = selectedRoutineSubject.value
+        else { return }
+
+        let deleteSubRoutineEntity = routine.subRoutines.map({
+            DeleteSubRoutineEntity(subRoutineId: $0.id, routineCompletionId: $0.completionId) })
+        let deleteRoutinEntity = DeleteRoutineEntity(
+            routineId: routine.id,
+            routineCompletionId: routine.completionId,
+            historySeq: routine.historySeq,
+            performedDate: today.convertToString(dateType: .yearMonthDate),
+            routineType: routine.routineType,
+            subRoutineInfosForDelete: deleteSubRoutineEntity)
+
+        Task {
+            do {
+                try await routineUseCase.deleteDailyRoutine(routine: deleteRoutinEntity)
+                deleteRoutineResultSubject.send(true)
+            } catch {
+                deleteRoutineResultSubject.send(false)
+            }
+        }
     }
 }
