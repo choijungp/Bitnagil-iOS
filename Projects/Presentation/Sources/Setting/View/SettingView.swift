@@ -6,7 +6,9 @@
 //
 
 import Combine
+import Domain
 import SafariServices
+import Shared
 import SnapKit
 import UIKit
 
@@ -25,14 +27,14 @@ final class SettingView: BaseViewController<SettingViewModel> {
     }
 
     private enum Section: Int, CaseIterable {
-        case notification
+//        case notification
         case information
         case account
 
         var title: String {
             switch self {
-            case .notification:
-                return "알림"
+//            case .notification:
+//                return "알림"
             case .information:
                 return "정보"
             case .account:
@@ -114,6 +116,11 @@ final class SettingView: BaseViewController<SettingViewModel> {
     override func configureAttribute() {
         view.backgroundColor = .white
 
+        guard
+            let authRepository = DIContainer.shared.resolve(type: AuthRepositoryProtocol.self),
+            let appConfigRepository = DIContainer.shared.resolve(type: AppConfigRepositoryProtocol.self)
+        else { fatalError("authRepository, appConfigRepository 의존성이 등록되지 않았습니다.") }
+
         tableView.delegate = self
         tableView.dataSource = self
         tableView.separatorStyle = .none
@@ -122,6 +129,8 @@ final class SettingView: BaseViewController<SettingViewModel> {
         tableView.register(BitnagilButtonTableViewCell.self, forCellReuseIdentifier: BitnagilButtonTableViewCell.className)
         tableView.register(BitnagilChevronTableViewCell.self, forCellReuseIdentifier: BitnagilChevronTableViewCell.className)
         tableView.register(SettingHeaderView.self, forHeaderFooterViewReuseIdentifier: SettingHeaderView.className)
+        viewModel.configure(authRepository: authRepository, appConfigRepository: appConfigRepository)
+        viewModel.action(input: .fetchVersion)
     }
 
     override func configureLayout() {
@@ -133,39 +142,42 @@ final class SettingView: BaseViewController<SettingViewModel> {
     }
 
     override func bind() {
-        viewModel.output.generalNotificationEnabled
-            .receive(on: DispatchQueue.main)
-            .sink(receiveValue: { [weak self] isEnabled in
-                let indexPath = IndexPath(row: NotificationSection.general.rawValue, section: Section.notification.rawValue)
-                guard
-                    let self,
-                    let cell = self.tableView.cellForRow(at: indexPath) as? BitnagilToggleTableViewCell
-                else { return }
-
-                cell.configureToggleState(isOn: isEnabled)
-            })
-            .store(in: &cancellables)
-
-        viewModel.output.pushNotificationEnabled
-            .receive(on: DispatchQueue.main)
-            .sink(receiveValue: { [weak self] isEnabled in
-                let indexPath = IndexPath(row: NotificationSection.push.rawValue, section: Section.notification.rawValue)
-                guard
-                    let self,
-                    let cell = self.tableView.cellForRow(at: indexPath) as? BitnagilToggleTableViewCell
-                else { return }
-
-                cell.configureToggleState(isOn: isEnabled)
-            })
-            .store(in: &cancellables)
+//        viewModel.output.generalNotificationEnabled
+//            .receive(on: DispatchQueue.main)
+//            .sink(receiveValue: { [weak self] isEnabled in
+//                let indexPath = IndexPath(row: NotificationSection.general.rawValue, section: Section.notification.rawValue)
+//                guard
+//                    let self,
+//                    let cell = self.tableView.cellForRow(at: indexPath) as? BitnagilToggleTableViewCell
+//                else { return }
+//
+//                cell.configureToggleState(isOn: isEnabled)
+//            })
+//            .store(in: &cancellables)
+//
+//        viewModel.output.pushNotificationEnabled
+//            .receive(on: DispatchQueue.main)
+//            .sink(receiveValue: { [weak self] isEnabled in
+//                let indexPath = IndexPath(row: NotificationSection.push.rawValue, section: Section.notification.rawValue)
+//                guard
+//                    let self,
+//                    let cell = self.tableView.cellForRow(at: indexPath) as? BitnagilToggleTableViewCell
+//                else { return }
+//
+//                cell.configureToggleState(isOn: isEnabled)
+//            })
+//            .store(in: &cancellables)
 
         viewModel.output.urlPublisher
             .receive(on: DispatchQueue.main)
-            .sink(receiveValue: { [weak self] url in
-                guard let url else { return }
-
-                let safariView = SFSafariViewController(url: url)
-                self?.present(safariView, animated: true)
+            .sink(receiveValue: { [weak self] urlType in
+                switch urlType {
+                case .internal(let url):
+                    let safariView = SFSafariViewController(url: url)
+                    self?.present(safariView, animated: true)
+                case .external(let url):
+                    UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                }
             })
             .store(in: &cancellables)
 
@@ -180,9 +192,9 @@ final class SettingView: BaseViewController<SettingViewModel> {
 
                 switch versionType {
                 case .needUpdate(let version):
-                    cell.configure(title: "버전\(version)", buttonTitle: "업데이트", isButtonEnabled: true)
+                    cell.configure(title: "버전 \(version)", buttonTitle: "업데이트", isButtonEnabled: true)
                 case .latest(let version):
-                    cell.configure(title: "버전\(version)", buttonTitle: "최신", isButtonEnabled: false)
+                    cell.configure(title: "버전 \(version)", buttonTitle: "최신", isButtonEnabled: false)
                 }
             })
             .store(in: &cancellables)
@@ -190,7 +202,18 @@ final class SettingView: BaseViewController<SettingViewModel> {
         viewModel.output.isAuthenticatedPublisher
             .receive(on: DispatchQueue.main)
             .sink(receiveValue: { isAuthenticated in
-            // 로그아웃 완료 후 홈 화면으로
+                if !isAuthenticated {
+                    guard
+                        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                        let sceneDelegate = windowScene.delegate as? UIWindowSceneDelegate,
+                        let window = sceneDelegate.window
+                    else { return }
+
+                    let introView = IntroView()
+                    let navigationController = UINavigationController(rootViewController: introView)
+                    window?.rootViewController = navigationController
+                    window?.makeKeyAndVisible()
+                }
             })
             .store(in: &cancellables)
     }
@@ -201,8 +224,8 @@ extension SettingView: UITableViewDelegate {
         let section = Section.allCases[indexPath.section]
 
         switch section {
-        case .notification:
-            return
+//        case .notification:
+//            return
         case .information:
             let row = InformationSection.allCases[indexPath.row]
             switch row {
@@ -250,8 +273,8 @@ extension SettingView: UITableViewDelegate {
 extension SettingView: UITableViewDataSource {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch Section.allCases[section] {
-        case .notification:
-            return NotificationSection.allCases.count
+//        case .notification:
+//            return NotificationSection.allCases.count
         case .information:
             return InformationSection.allCases.count
         case .account:
@@ -269,9 +292,9 @@ extension SettingView: UITableViewDataSource {
         let cellStyle: CellStyle
 
         switch section {
-        case .notification:
-            let row = NotificationSection.allCases[indexPath.row]
-            cellStyle = row.cellStyle
+//        case .notification:
+//            let row = NotificationSection.allCases[indexPath.row]
+//            cellStyle = row.cellStyle
         case .information:
             let row = InformationSection.allCases[indexPath.row]
             cellStyle = row.cellStyle
@@ -306,7 +329,11 @@ extension SettingView: UITableViewDataSource {
         guard let headerView = tableView.dequeueReusableHeaderFooterView(withIdentifier: SettingHeaderView.className) as? SettingHeaderView else { return nil }
 
         switch section {
-        case .notification:
+//        case .notification:
+//            let view = UIView()
+//            view.backgroundColor = .white
+//            return view
+        case .information:
             let view = UIView()
             view.backgroundColor = .white
             return view
@@ -320,8 +347,8 @@ extension SettingView: UITableViewDataSource {
         let section = Section.allCases[section]
 
         switch section {
-        case .notification:
-            return Layout.tableViewTopSpacing
+//        case .notification:
+//            return Layout.tableViewTopSpacing
         default:
             return Layout.tableViewHeaderHeight
         }
@@ -361,14 +388,14 @@ extension SettingView: BitnagilToggleTableViewCellDelegate {
 
         let section = Section.allCases[indexPath.section]
         switch section {
-        case .notification:
-            let row = NotificationSection.allCases[indexPath.row]
-            switch row {
-            case .general:
-                viewModel.action(input: .toggleGeneralNotification)
-            case .push:
-                viewModel.action(input: .togglePushNotification)
-            }
+//        case .notification:
+//            let row = NotificationSection.allCases[indexPath.row]
+//            switch row {
+//            case .general:
+//                viewModel.action(input: .toggleGeneralNotification)
+//            case .push:
+//                viewModel.action(input: .togglePushNotification)
+//            }
         default:
             break
         }
