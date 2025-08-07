@@ -10,13 +10,6 @@ import UIKit
 extension UIViewController {
     // MARK: - NavigationBar
     func configureNavigationBar(navigationStyle: NavigationBarStyle) {
-        let appearance = UINavigationBarAppearance()
-        appearance.backgroundEffect = .none
-        appearance.configureWithOpaqueBackground()
-        appearance.shadowColor = .clear
-        navigationController?.navigationBar.standardAppearance = appearance
-        navigationController?.navigationBar.scrollEdgeAppearance = appearance
-
         switch navigationStyle {
         case .hidden:
             navigationController?.setNavigationBarHidden(true, animated: false)
@@ -35,6 +28,11 @@ extension UIViewController {
             navigationController?.setNavigationBarHidden(false, animated: false)
             configureCustomBackButton()
             configureProgressNavigationBar(step: step, stepCount: stepCount)
+
+        case .withPrograssBarWithoutBackButton(let step, let stepCount):
+            navigationController?.setNavigationBarHidden(false, animated: false)
+            navigationController?.navigationItem.setHidesBackButton(true, animated: false)
+            configureProgressNavigationBar(step: step, stepCount: stepCount)
         }
     }
 
@@ -46,6 +44,7 @@ extension UIViewController {
             action: #selector(popViewController))
         backButton.tintColor = .black
         navigationItem.leftBarButtonItem = backButton
+        changeNavigationBackground(color: .white)
     }
 
     private func configureCustomBackButton() {
@@ -56,12 +55,14 @@ extension UIViewController {
             action: #selector(popTwoViewControllers))
         backButton.tintColor = .black
         navigationItem.leftBarButtonItem = backButton
+        changeNavigationBackground(color: .white)
     }
 
     private func configureProgressNavigationBar(step: Int, stepCount: Int) {
         self.title = ""
         let progressView = ProgressBarView(step: step, stepCount: stepCount)
         navigationItem.titleView = progressView
+        changeNavigationBackground(color: BitnagilColor.gray99)
     }
 
     @objc private func popViewController() {
@@ -82,6 +83,17 @@ extension UIViewController {
         navigationController.popToViewController(targetViewController, animated: true)
     }
 
+    private func changeNavigationBackground(color: UIColor?) {
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = color
+        appearance.shadowColor = .clear
+
+        navigationController?.navigationBar.standardAppearance = appearance
+        navigationController?.navigationBar.scrollEdgeAppearance = appearance
+        navigationController?.navigationBar.compactAppearance = appearance
+    }
+
     // MARK: - BottomSheet
     func presentCustomBottomSheet(contentViewController: UIViewController, maxHeight: CGFloat) {
         let bottomSheet = CustomBottomSheet(contentViewController: contentViewController, maxHeight: maxHeight)
@@ -94,4 +106,5 @@ enum NavigationBarStyle {
     case withBackButton(title: String)
     case withPrograssBar(step: Int, stepCount: Int)
     case withPrograssBarWithCustomBackButton(step: Int, stepCount: Int)
+    case withPrograssBarWithoutBackButton(step: Int, stepCount: Int)
 }

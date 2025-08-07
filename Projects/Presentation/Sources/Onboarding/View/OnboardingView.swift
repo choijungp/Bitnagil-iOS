@@ -10,7 +10,7 @@ import Domain
 import SnapKit
 import UIKit
 
-final class OnboardingView: BaseViewController<OnboardingViewModel> {
+public final class OnboardingView: BaseViewController<OnboardingViewModel> {
 
     private enum Layout {
         static let horizontalMargin: CGFloat = 20
@@ -38,7 +38,7 @@ final class OnboardingView: BaseViewController<OnboardingViewModel> {
 
     private let isFromMypage: Bool
     private var cancellables: Set<AnyCancellable>
-    init(
+    public init(
         viewModel: OnboardingViewModel,
         onboarding: OnboardingType,
         isFromMypage: Bool = false
@@ -53,20 +53,20 @@ final class OnboardingView: BaseViewController<OnboardingViewModel> {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
-    }
-
-    override func viewWillAppear(_ animated: Bool) {
+    public override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
 
         let stepCount = OnboardingType.allCases.count + 1
-        configureNavigationBar(navigationStyle: .withPrograssBar(step: onboarding.step, stepCount: stepCount))
+        if !isFromMypage && onboarding == .time {
+            configureNavigationBar(navigationStyle: .withPrograssBarWithoutBackButton(step: onboarding.step, stepCount: stepCount))
+        } else {
+            configureNavigationBar(navigationStyle: .withPrograssBar(step: onboarding.step, stepCount: stepCount))
+        }
 
         self.viewModel.action(input: .fetchOnboardingChoice(onboarding: onboarding))
     }
 
-    override func viewDidLayoutSubviews() {
+    public override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
 
         if !isLayoutConfigured {
