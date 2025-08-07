@@ -31,6 +31,7 @@ final class HomeView: BaseViewController<HomeViewModel> {
         static let weekViewHeight: CGFloat = 127
         static let routineSortButtonTrailingSpacing: CGFloat = 8
         static let routineSortButtonSize: CGFloat = 40
+        static let routineSortViewHeight: CGFloat = 192
         static let routineStackViewSpacing: CGFloat = 21
         static let routineStackViewTopSpacing: CGFloat = 23
         static let routineStackViewBottomSpacing: CGFloat = 100
@@ -80,6 +81,8 @@ final class HomeView: BaseViewController<HomeViewModel> {
     private var isShowingDeleteAlertView: Bool = false
     private let deleteAlertView = RoutineDeleteAlertView()
 
+    private let loadingIndicatorView = UIActivityIndicatorView(style: .large)
+
     private var contentViewTopConstraint: Constraint?
     private var cancellables: Set<AnyCancellable>
 
@@ -96,6 +99,7 @@ final class HomeView: BaseViewController<HomeViewModel> {
         super.viewDidLoad()
         configureNavigationBar(navigationStyle: .hidden)
         configureGradientBackground()
+        showIndicatorView()
         viewModel.action(input: .loadNickname)
         viewModel.action(input: .fetchRoutines)
     }
@@ -103,7 +107,7 @@ final class HomeView: BaseViewController<HomeViewModel> {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         configureNavigationBar(navigationStyle: .hidden)
-        viewModel.action(input: .fetchEmotion)
+        viewModel.action(input: .loadEmotion)
     }
 
     override func viewDidLayoutSubviews() {
@@ -192,6 +196,9 @@ final class HomeView: BaseViewController<HomeViewModel> {
 
         deleteAlertView.delegate = self
         deleteAlertView.isHidden = true
+
+        loadingIndicatorView.hidesWhenStopped = true
+        loadingIndicatorView.color = BitnagilColor.gray40
     }
 
     override func configureLayout() {
@@ -210,6 +217,7 @@ final class HomeView: BaseViewController<HomeViewModel> {
         contentView.addSubview(routineScrollView)
         routineScrollView.addSubview(routineSortButton)
         routineScrollView.addSubview(routineStackView)
+        contentView.addSubview(loadingIndicatorView)
 
         view.addSubview(dimmedView)
         view.addSubview(floatingMenu)
@@ -309,6 +317,10 @@ final class HomeView: BaseViewController<HomeViewModel> {
             make.width.equalTo(Layout.deleteAlertViewWidth)
             make.height.equalTo(Layout.deleteAlertViewHeight)
         }
+
+        loadingIndicatorView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+        }
     }
 
     override func bind() {
@@ -323,7 +335,8 @@ final class HomeView: BaseViewController<HomeViewModel> {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] fetchRoutineResult in
                 if fetchRoutineResult {
-                    self?.viewModel.action(input: .fetchDailyRoutines(date: Date()))
+                    self?.viewModel.action(input: .refreshSelectedDateRoutine)
+                    self?.hideIndicatorView()
                 }
             }
             .store(in: &cancellables)
@@ -350,7 +363,18 @@ final class HomeView: BaseViewController<HomeViewModel> {
                     if self.isShowingDeleteAlertView {
                         self.toggleDeleteAlertView()
                     }
-                    viewModel.action(input: .fetchRoutines)
+                    viewModel.action(input: .refreshSelectedDateRoutine)
+                    hideIndicatorView()
+                }
+            }
+            .store(in: &cancellables)
+
+        viewModel.output.updateRoutineCompletionResultPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isUpdateRoutineCompletion in
+                if isUpdateRoutineCompletion {
+                    self?.viewModel.action(input: .refreshSelectedDateRoutine)
+                    self?.hideIndicatorView()
                 }
             }
             .store(in: &cancellables)
@@ -371,7 +395,7 @@ final class HomeView: BaseViewController<HomeViewModel> {
         if !tooltipView.isHidden {
             hideTooltipView()
         }
-        presentCustomBottomSheet(contentViewController: routineSortView, maxHeight: 192)
+        presentCustomBottomSheet(contentViewController: routineSortView, maxHeight: Layout.routineSortViewHeight)
     }
 
     // 해당 날짜의 Routine View를 설정합니다. (없다면 EmptyView)
@@ -514,13 +538,23 @@ final class HomeView: BaseViewController<HomeViewModel> {
         informationButton.isSelected = false
         tooltipView.hideTooltip()
     }
+
+    private func showIndicatorView() {
+        loadingIndicatorView.startAnimating()
+        contentView.isUserInteractionEnabled = false
+    }
+
+    private func hideIndicatorView() {
+        loadingIndicatorView.stopAnimating()
+        contentView.isUserInteractionEnabled = true
+    }
 }
 
 // MARK: RoutineViewDelegate
 extension HomeView: RoutineViewDelegate {
     func routineView(_ sender: RoutineView, didTapMainRoutineCheckButton mainRoutine: MainRoutine) {
-        sender.updateMainRoutineState(isDone: !mainRoutine.isDone)
-        // TODO: 메인 루틴 완료 버튼 체크의 서버 통신을 수행해야 합니다. (viewModel에 action 정의)
+        showIndicatorView()
+        viewModel.action(input: .updateRoutineCompletion(updatedRoutine: mainRoutine))
     }
 
     func routineView(_ sender: RoutineView, didTapMainRoutineMoreButton mainRoutine: MainRoutine) {
@@ -535,26 +569,29 @@ extension HomeView: RoutineViewDelegate {
     }
 
     func routineView(_ sender: RoutineView, didTapSubRoutineCheckButton subRoutine: SubRoutine) {
-        sender.updateSubRoutineState(subRoutine: subRoutine, isDone: !subRoutine.isDone)
-        // TODO: 서브 루틴 완료 버튼 체크의 서버 통신을 수행해야 합니다. (viewModel에 action 정의)
+        showIndicatorView()
+        viewModel.action(input: .updateRoutineCompletion(updatedRoutine: subRoutine))
     }
 }
 
 // MARK: SelectableItemTableViewDelegate
 extension HomeView: SelectableItemTableViewDelegate {
     func selectableItemTableView<T: SelectableItem & CaseIterable & Equatable>(_ sender: SelectableItemTableView<T>, didSelectItem: T?) {
-        // TODO: 완료 · 미완료 루틴을 정렬해야 합니다.
+        guard let sortType = didSelectItem as? RoutineSortType?
+        else { return }
+
+        viewModel.action(input: .selectRoutineSortType(routineSortType: sortType))
     }
 }
 
 // MARK: WeekViewDelegate
 extension HomeView: WeekViewDelegate {
     func weekView(_ sender: WeekView, didMoveWeek weekStartDate: Date) {
-        viewModel.action(input: .fetchDailyRoutines(date: weekStartDate))
+        viewModel.action(input: .selectDate(date: weekStartDate))
     }
     
     func weekView(_ sender: WeekView, didSelectDate date: Date) {
-        viewModel.action(input: .fetchDailyRoutines(date: date))
+        viewModel.action(input: .selectDate(date: date))
     }
 }
 
@@ -603,10 +640,12 @@ extension HomeView: RoutineDetailViewDelegate {
 // MARK: RoutineDeleteAlertViewDelegate
 extension HomeView: RoutineDeleteAlertViewDelegate {
     func routineDeleteAlertViewDidTapDeleteAllRoutine(_ sender: RoutineDeleteAlertView) {
+        showIndicatorView()
         viewModel.action(input: .deleteAllRoutine)
     }
     
     func routineDeleteAlertViewDidTapDeleteDailyRoutine(_ sender: RoutineDeleteAlertView) {
+        showIndicatorView()
         viewModel.action(input: .deleteDailyRoutine)
     }
 }
