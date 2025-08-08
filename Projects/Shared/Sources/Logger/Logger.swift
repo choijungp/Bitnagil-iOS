@@ -18,6 +18,7 @@ public enum BitnagilLogger {
         line: Int = #line
     ) {
         let fileName = (file as NSString).lastPathComponent
-        logger.log(level: logType, "[\(fileName):\(line)] \(function): \(message)")
+        let logMessage = "[\(fileName):\(line)] \(function): \(message)"
+        logger.log(level: logType, "\(logMessage, privacy: .private)")
     }
 }
