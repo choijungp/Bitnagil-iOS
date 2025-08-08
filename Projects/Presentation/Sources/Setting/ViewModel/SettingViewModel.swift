@@ -18,7 +18,7 @@ final class SettingViewModel: ViewModel {
         fileprivate var url: URL? {
             switch self {
             case .update:
-                return URL(string: "itms-apps://itunes.apple.com/app/{빛나길 id}")
+                return URL(string: "itms-apps://itunes.apple.com/app/id6749437799")
             case .terms:
                 return URL(string: "https://complex-wombat-99f.notion.site/2025-7-20-236f4587491d8071833adfaf8115bce2")
             case .privacy:
