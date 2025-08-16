@@ -13,6 +13,7 @@ final class HomeViewModel: ViewModel {
     enum Input {
         case loadNickname
         case loadEmotion
+        case moveWeek(week: Int)
         case selectDate(date: Date)
         case fetchRoutines
         case selectRoutine(routine: MainRoutine?)
@@ -80,6 +81,9 @@ final class HomeViewModel: ViewModel {
         case .loadEmotion:
             fetchEmotion()
 
+        case .moveWeek(let week):
+            moveWeek(by: week)
+
         case .selectDate(let date):
             selectDate(date: date)
 
@@ -123,13 +127,21 @@ final class HomeViewModel: ViewModel {
     private func fetchEmotion() {
         Task {
             do {
-                let emotionEntity = try await emotionUseCase.fetchEmotion(date: today)
+                let emotionEntity = try await emotionUseCase.loadEmotion(date: today)
                 let emotion = emotionEntity?.toEmotion()
                 emotionSubject.send(emotion)
             } catch {
 
             }
         }
+    }
+
+    // MARK: - 날짜
+    private func moveWeek(by week: Int) {
+        let currentDate = selectedDateSubject.value
+        guard let weekStartDate = calendar.date(byAdding: .weekOfYear, value: week, to: currentDate)
+        else { return }
+        selectedDateSubject.send(weekStartDate)
     }
 
     // MARK: - 루틴

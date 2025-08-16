@@ -14,6 +14,7 @@ enum BitnagilIcon {
 
     // MARK: - Common Icons
     static let backButtonIcon = UIImage(named: "back_button_icon", in: bundle, with: nil)
+    static let plusIcon = UIImage(named: "plus_icon", in: bundle, with: nil)?.withRenderingMode(.alwaysTemplate)
 
     // MARK: - Login Icons
     static let kakaoIcon = UIImage(named: "kakao_icon", in: bundle, with: nil)
@@ -29,28 +30,31 @@ enum BitnagilIcon {
     static let circleTwoIcon = UIImage(named: "circle_two_icon", in: bundle, with: nil)
     static let circleThreeIcon = UIImage(named: "circle_three_icon", in: bundle, with: nil)
 
-    static let plusIcon = UIImage(named: "plus_icon", in: bundle, with: nil)?.withRenderingMode(.alwaysTemplate)
+    // MARK: - Home Icons
+    static let helpIcon = UIImage(named: "help_icon", in: bundle, with: nil)
+    static let alarmIcon = UIImage(named: "alarm_icon", in: bundle, with: nil)
+    static let alarmWithBadgeIcon = UIImage(named: "alarm_badge_icon", in: bundle, with: nil)
+    static let chevronLeftIcon = UIImage(named: "chevron_left_icon", in: bundle, with: nil)
+    static let chevronRightIcon = UIImage(named: "chevron_right_icon", in: bundle, with: nil)
+    static let checkedCircleIcon = UIImage(named: "checked_circle_icon", in: bundle, with: nil)
+    static let uncheckedCircleIcon = UIImage(named: "unchecked_circle_icon", in: bundle, with: nil)
+    static let checkedCircleSmallIcon = UIImage(named: "checked_circle_small_icon", in: bundle, with: nil)
+    static let uncheckedCircleSmallIcon = UIImage(named: "unchecked_circle_small_icon", in: bundle, with: nil)
+
     static let chevronIcon = UIImage(named: "chevron_icon", in: bundle, with: nil)
     static func chevronIcon(direction: Direction) -> UIImage? {
         return BitnagilIcon.chevronIcon?.rotate(degrees: direction.rotation)?.withRenderingMode(.alwaysTemplate)
     }
     static let ellipsisIcon = UIImage(named: "ellipsis_icon", in: bundle, with: nil)
     static let informationIcon = UIImage(named: "information_icon", in: bundle, with: nil)
-    static let sortIcon = UIImage(named: "sort_icon", in: bundle, with: nil)
     static let addRoutineIcon = UIImage(named: "add_routine_icon", in: bundle, with: nil)
 
     // MARK: - Tab Bar Icons
-    static let homeFillIcon = UIImage(named: "home_fill_icon", in: bundle, with: nil)
-    static let homeEmptyIcon = UIImage(named: "home_empty_icon", in: bundle, with: nil)
-
-    static let recommendFillIcon = UIImage(named: "recommend_fill_icon",in: bundle, with: nil)
-    static let recommendEmptyIcon = UIImage(named: "recommend_empty_icon", in: bundle, with: nil)
-
+    static let homeIcon = UIImage(named: "home_fill_icon", in: bundle, with: nil)
+    static let recommendIcon = UIImage(named: "recommend_fill_icon",in: bundle, with: nil)
     static let reportFillIcon = UIImage(named: "report_fill_icon", in: bundle, with: nil)?.withRenderingMode(.alwaysOriginal)
     static let reportEmptyIcon = UIImage(named: "report_empty_icon", in: bundle, with: nil)?.withRenderingMode(.alwaysOriginal)
-
-    static let mypageFillIcon = UIImage(named: "mypage_fill_icon", in: bundle, with: nil)
-    static let mypageEmptyIcon = UIImage(named: "mypage_empty_icon", in: bundle, with: nil)
+    static let mypageIcon = UIImage(named: "mypage_fill_icon", in: bundle, with: nil)
 
     // MARK: - Mypage Icons
     static let settingIcon = UIImage(named: "setting_icon", in: bundle, with: nil)

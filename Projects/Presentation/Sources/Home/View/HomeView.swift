@@ -12,81 +12,81 @@ import SnapKit
 import UIKit
 
 final class HomeView: BaseViewController<HomeViewModel> {
-
     private enum Layout {
         static let horizontalMargin: CGFloat = 20
-        static let homeLabelTopSpacing: CGFloat = 41
-        static let homeLabelHeight: CGFloat = 64
-        static let informationButton: CGFloat = 24
-        static let informationButtonLeadingSpacing: CGFloat = 1
-        static let informationButtonBottomSpacing: CGFloat = 4
-        static let informationButtonSize: CGFloat = 24
-        static let registerEmotionButtonTopSpacing: CGFloat = 3
-        static let registerEmotionButtonHeight: CGFloat = 44
+        static let headerViewHeight: CGFloat = 48
+        static let logoImageWidth: CGFloat = 71
+        static let logoImageHeight: CGFloat = 22
+        static let headerIconTrailingSpacing: CGFloat = 8
+        static let homeLabelTopSpacing: CGFloat = 18
+        static let homeLabelHeight: CGFloat = 60
+        static let registerEmotionButtonTopSpacing: CGFloat = 16
+        static let registerEmotionButtonHeight: CGFloat = 36
         static let registerEmotionButtonWidth: CGFloat = 136
-        static let emotionOrbViewTopSpacing: CGFloat = 46
-        static let emotionOrbViewTrailingSpacing: CGFloat = 35
-        static let emotionOrbViewSize: CGFloat = 172
+        static let emotionOrbViewTopSpacing: CGFloat = 66
+        static let emotionOrbViewTrailingSpacing: CGFloat = 24
+        static let emotionOrbViewWidth: CGFloat = 108
+        static let emotionOrbViewHeight: CGFloat = 149
         static let contentViewCornerRadius: CGFloat = 20
-        static let weekViewHeight: CGFloat = 127
-        static let routineSortButtonTrailingSpacing: CGFloat = 8
-        static let routineSortButtonSize: CGFloat = 40
-        static let routineSortViewHeight: CGFloat = 192
+        static let monthLabelHeight: CGFloat = 24
+        static let moveWeekButtonSize: CGFloat = 48
+        static let weekViewHeight: CGFloat = 92
+        static let weekStackViewTopSpacing: CGFloat = 10
+        static let routineHeaderViewTopSpacing: CGFloat = 6
+        static let routineHeaderViewHeight: CGFloat = 20
+        static let routineListButtonHeight: CGFloat = 18
         static let routineStackViewSpacing: CGFloat = 21
-        static let routineStackViewTopSpacing: CGFloat = 23
+        static let routineScrollViewTopSpacing: CGFloat = 14
         static let routineStackViewBottomSpacing: CGFloat = 100
         static let emptyViewTopSpacing: CGFloat = 77
         static let emptyViewHeight: CGFloat = 120
-        static let collapsedTop: CGFloat = 225
-        static let expandedTop: CGFloat = 40
+        static let collapsedTop: CGFloat = 210
+        static let expandedTop: CGFloat = 48
         static let floatingButtonBottomSpacing: CGFloat = 19
         static let floatingButtonSize: CGFloat = 52
-        static let floatingMenuBottomSpacing: CGFloat = 15
-        static let floatingMenuHeight: CGFloat = 64
+        static let floatingMenuBottomSpacing: CGFloat = 16
+        static let floatingMenuHeight: CGFloat = 56
         static let floatingMenuWidth: CGFloat = 144
-        static let tooltipViewTailLeadingSpacing: CGFloat = 78.68
-        static let tooltipViewLeadingSpacing: CGFloat = 76
-        static let tooltipViewBottomSpacing: CGFloat = 4
-        static let tooltipViewWidth: CGFloat = 176
-        static let tooltipViewHeight: CGFloat = 47
-        static let routineDetailViewDefaultHeight: CGFloat = 367
-        static let routineDetailViewSubRoutineHeight: CGFloat = 25
-        static let deleteAlertViewWidth: CGFloat = 298
-        static let deleteAlertViewHeight: CGFloat = 214
-        static let toastMessageBottomSpacing: CGFloat = 19
-        static let toastMessageWidth: CGFloat = 265
-        static let toastMessageHeight: CGFloat = 44
     }
 
-    private let gradientLayer = CAGradientLayer()
+    // headerView
+    private let headerView = UIView()
+    private let logoImageView = UIImageView()
+    private let helpButton = UIButton()
+    private let alarmButton = UIButton()
+
+    // label + emotion
+    private var nickname: String = ""
     private let homeLabel = UILabel()
-    private let informationButton = UIButton()
     private let emotionOrbView = UIImageView()
-    private let registerEmotionButtonActionIdentifier = UIAction.Identifier("goToEmotionRegisterView")
     private let registerEmotionButton = HomeRegisterEmotionButton()
 
+    // contentView
     private let contentView = UIView()
+
+    // weekView
+    private let weekStackView = UIStackView()
+    private let weekHeaderView = UIView()
+    private let monthLabel = UILabel()
+    private let previousWeekButton = UIButton()
+    private let nextWeekButton = UIButton()
     private let weekView = WeekView()
+
+    // routineView
     private let emptyView = HomeEmptyView()
-
+    private let routineHeaderView = UIView()
+    private let routineListLabel = UILabel()
+    private let routineListButton = UIButton()
     private let routineScrollView = UIScrollView()
-    private let routineSortButton = UIButton()
-    private let routineSortView = SelectableItemTableView<RoutineSortType>(items: [RoutineSortType.complete, RoutineSortType.incomplete])
     private let routineStackView = UIStackView()
+    private let loadingIndicatorView = UIActivityIndicatorView(style: .large)
 
-    private let toastMessageView = ToastMessageView()
-    private let tooltipView = TooltipView(tailPosition: .offsetFromLeading(Layout.tooltipViewTailLeadingSpacing))
-
+    // floatingButton
     private var isShowingFloatingMenu: Bool = false
     private let dimmedView = UIView()
     private let floatingButton = FloatingButton()
     private let floatingMenu = FloatingMenuView()
     private var bottomSheet: CustomBottomSheet?
-
-    private var isShowingDeleteAlertView: Bool = false
-    private let deleteAlertView = RoutineDeleteAlertView()
-
-    private let loadingIndicatorView = UIActivityIndicatorView(style: .large)
 
     private var contentViewTopConstraint: Constraint?
     private var cancellables: Set<AnyCancellable>
@@ -102,85 +102,91 @@ final class HomeView: BaseViewController<HomeViewModel> {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        configureGradientBackground()
         showIndicatorView()
         viewModel.action(input: .loadNickname)
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(true, animated: false)
         viewModel.action(input: .loadEmotion)
         viewModel.action(input: .fetchRoutines)
     }
 
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        gradientLayer.frame = view.bounds
-    }
-
     override func configureAttribute() {
-        homeLabel.text = "님,\n오늘 기분 어때요?"
-        homeLabel.numberOfLines = 2
-        homeLabel.font = BitnagilFont(
+        logoImageView.image = BitnagilGraphic.grayLogoGraphic
+        helpButton.setImage(BitnagilIcon.helpIcon, for: .normal)
+        alarmButton.setImage(BitnagilIcon.alarmIcon, for: .normal)
+
+        let homeLabelText = "\(nickname)\n"
+        homeLabel.attributedText = BitnagilFont(
             family: .cafe24Ssurround,
             style: .cafe24Title1,
-            weight: .light).font
-        homeLabel.textColor = BitnagilColor.gray10
+            weight: .light).attributedString(text: homeLabelText)
+        homeLabel.numberOfLines = 2
+        homeLabel.textColor = .white
 
-        informationButton.setImage(BitnagilIcon.informationIcon, for: .normal)
-        informationButton.addAction(UIAction { [weak self] _ in
-            self?.informationButton.isSelected.toggle()
-            if self?.informationButton.isSelected ?? false {
-                self?.tooltipView.showTooltip()
-            } else {
-                self?.tooltipView.hideTooltip()
-            }
-        }, for: .touchUpInside)
+        registerEmotionButton.addAction(
+            UIAction { [weak self] _ in
+                self?.goToEmotionRegisterView()
+            },
+            for: .touchUpInside)
 
-        let registerEmotionAction = UIAction(identifier: registerEmotionButtonActionIdentifier) { [weak self] _ in
-            self?.goToEmotionRegisterView()
-        }
-        registerEmotionButton.addAction(registerEmotionAction, for: .touchUpInside)
-
-        contentView.backgroundColor = .white
+        contentView.backgroundColor = BitnagilColor.gray99
         contentView.layer.cornerRadius = Layout.contentViewCornerRadius
         contentView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         contentView.clipsToBounds = true
 
+        weekStackView.axis = .vertical
+        weekStackView.spacing = 4
+
+        monthLabel.text = " "
+        monthLabel.font = BitnagilFont(style: .title3, weight: .semiBold).font
+        monthLabel.textColor = BitnagilColor.gray10
+
+        previousWeekButton.setImage(BitnagilIcon.chevronLeftIcon, for: .normal)
+        previousWeekButton.addAction(
+            UIAction { [weak self] _ in
+                self?.viewModel.action(input: .moveWeek(week: -1))
+            }, for: .touchUpInside)
+
+        nextWeekButton.setImage(BitnagilIcon.chevronRightIcon, for: .normal)
+        nextWeekButton.addAction(
+            UIAction { [weak self] _ in
+                self?.viewModel.action(input: .moveWeek(week: 1))
+            }, for: .touchUpInside)
+
         let panGesture = UIPanGestureRecognizer()
         panGesture.addTarget(self, action: #selector(handlePanGesture(_:)))
-        weekView.addGestureRecognizer(panGesture)
-        weekView.isUserInteractionEnabled = true
+        weekStackView.addGestureRecognizer(panGesture)
+        weekStackView.isUserInteractionEnabled = true
         weekView.delegate = self
 
         emptyView.didTapRegisterRoutineButton = {
-            guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self) else {
-                fatalError("routineCreationViewModel 의존성이 등록되지 않았습니다.")
-            }
+            guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self)
+            else { fatalError("routineCreationViewModel 의존성이 등록되지 않았습니다.") }
+
             let routineCreationView = RoutineCreationView(viewModel: routineCreationViewModel)
             routineCreationView.hidesBottomBarWhenPushed = true
             self.navigationController?.pushViewController(routineCreationView, animated: true)
         }
 
+        routineListLabel.text = "루틴 리스트"
+        routineListLabel.font = BitnagilFont(style: .body2, weight: .semiBold).font
+        routineListLabel.textColor = BitnagilColor.gray60
+
+        routineListButton.setAttributedTitle(
+            BitnagilFont(style: .caption1, weight: .semiBold).attributedString(text: "더보기"),
+            for: .normal)
+        routineListButton.setTitleColor(BitnagilColor.gray10, for: .normal)
+
         routineScrollView.showsVerticalScrollIndicator = false
         routineScrollView.showsHorizontalScrollIndicator = false
-
-        routineSortButton.setImage(BitnagilIcon.sortIcon, for: .normal)
-        routineSortButton.addAction(UIAction { [weak self] _ in
-            self?.showRoutineSortBottomSheet()
-        }, for: .touchUpInside)
-
-        routineSortView.delegate = self
 
         routineStackView.axis = .vertical
         routineStackView.spacing = Layout.routineStackViewSpacing
         routineStackView.alignment = .fill
         routineStackView.distribution = .fill
-
-        tooltipView.configure(message: "감정 기록 시, 루틴을 추천 받아요!")
-        tooltipView.isHidden = true
-        let viewTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap))
-        view.addGestureRecognizer(viewTapGesture)
 
         floatingButton.addAction(UIAction { [weak self] _ in
             self?.toggleFloatingButton()
@@ -196,28 +202,38 @@ final class HomeView: BaseViewController<HomeViewModel> {
         let dimmedViewTapGesture = UITapGestureRecognizer(target: self, action: #selector(tappedDimmedView))
         dimmedView.addGestureRecognizer(dimmedViewTapGesture)
 
-        deleteAlertView.delegate = self
-        deleteAlertView.isHidden = true
-
         loadingIndicatorView.hidesWhenStopped = true
         loadingIndicatorView.color = BitnagilColor.gray40
     }
 
     override func configureLayout() {
         let safeArea = view.safeAreaLayoutGuide
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = BitnagilColor.gray10
+        navigationController?.setNavigationBarHidden(true, animated: false)
+
+        [logoImageView, helpButton, alarmButton].forEach {
+            headerView.addSubview($0)
+        }
+        view.addSubview(headerView)
 
         view.addSubview(homeLabel)
-        view.addSubview(informationButton)
-        view.addSubview(tooltipView)
         view.addSubview(emotionOrbView)
         view.addSubview(registerEmotionButton)
 
         view.addSubview(contentView)
-        contentView.addSubview(weekView)
+        [monthLabel, previousWeekButton, nextWeekButton].forEach {
+            weekHeaderView.addSubview($0)
+        }
+        [weekHeaderView, weekView].forEach {
+            weekStackView.addArrangedSubview($0)
+        }
+        contentView.addSubview(weekStackView)
         contentView.addSubview(emptyView)
+        [routineListLabel, routineListButton].forEach {
+            routineHeaderView.addSubview($0)
+        }
+        contentView.addSubview(routineHeaderView)
         contentView.addSubview(routineScrollView)
-        routineScrollView.addSubview(routineSortButton)
         routineScrollView.addSubview(routineStackView)
         contentView.addSubview(loadingIndicatorView)
 
@@ -225,30 +241,37 @@ final class HomeView: BaseViewController<HomeViewModel> {
         view.addSubview(floatingMenu)
         view.addSubview(floatingButton)
 
-        view.addSubview(deleteAlertView)
-        view.addSubview(toastMessageView)
+        headerView.snp.makeConstraints { make in
+            make.top.horizontalEdges.equalTo(safeArea)
+            make.height.equalTo(Layout.headerViewHeight)
+        }
+
+        logoImageView.snp.makeConstraints { make in
+            make.leading.equalTo(safeArea).offset(Layout.horizontalMargin)
+            make.centerY.equalToSuperview()
+            make.width.equalTo(Layout.logoImageWidth)
+            make.height.equalTo(Layout.logoImageHeight)
+        }
+
+        helpButton.snp.makeConstraints { make in
+            make.top.equalToSuperview()
+            make.trailing.equalTo(alarmButton.snp.leading).offset(Layout.headerIconTrailingSpacing)
+            make.size.equalTo(Layout.headerViewHeight)
+        }
+
+        alarmButton.snp.makeConstraints { make in
+            make.top.equalToSuperview()
+            make.trailing.equalToSuperview().inset(Layout.headerIconTrailingSpacing)
+            make.size.equalTo(Layout.headerViewHeight)
+        }
 
         homeLabel.snp.makeConstraints { make in
-            make.top.equalTo(safeArea).offset(Layout.homeLabelTopSpacing)
+            make.top.equalTo(headerView.snp.bottom).offset(Layout.homeLabelTopSpacing)
             make.leading.equalTo(safeArea).offset(Layout.horizontalMargin)
-            make.height.equalTo(Layout.homeLabelHeight)
-        }
-
-        informationButton.snp.makeConstraints { make in
-            make.leading.equalTo(homeLabel.snp.trailing).offset(Layout.informationButtonLeadingSpacing)
-            make.bottom.equalTo(homeLabel.snp.bottom).inset(Layout.informationButtonBottomSpacing)
-            make.size.equalTo(Layout.informationButtonSize)
-        }
-
-        tooltipView.snp.makeConstraints { make in
-            make.leading.equalTo(informationButton).offset(-Layout.tooltipViewLeadingSpacing)
-            make.bottom.equalTo(informationButton.snp.top).offset(-Layout.tooltipViewBottomSpacing)
-            make.width.equalTo(Layout.tooltipViewWidth)
-            make.height.equalTo(Layout.tooltipViewHeight)
         }
 
         registerEmotionButton.snp.makeConstraints { make in
-            make.leading.equalToSuperview()
+            make.leading.equalToSuperview().offset(Layout.horizontalMargin)
             make.top.equalTo(homeLabel.snp.bottom).offset(Layout.registerEmotionButtonTopSpacing)
             make.height.equalTo(Layout.registerEmotionButtonHeight)
             make.width.equalTo(Layout.registerEmotionButtonWidth)
@@ -256,8 +279,9 @@ final class HomeView: BaseViewController<HomeViewModel> {
 
         emotionOrbView.snp.makeConstraints { make in
             make.top.equalTo(safeArea).offset(Layout.emotionOrbViewTopSpacing)
-            make.trailing.equalToSuperview()
-            make.size.equalTo(Layout.emotionOrbViewSize)
+            make.trailing.equalToSuperview().inset(Layout.emotionOrbViewTrailingSpacing)
+            make.width.equalTo(Layout.emotionOrbViewWidth)
+            make.height.equalTo(Layout.emotionOrbViewHeight)
         }
 
         contentView.snp.makeConstraints { make in
@@ -266,27 +290,63 @@ final class HomeView: BaseViewController<HomeViewModel> {
             make.bottom.equalToSuperview()
         }
 
-        weekView.snp.makeConstraints { make in
+        monthLabel.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(Layout.horizontalMargin)
+            make.centerY.equalToSuperview()
+            make.height.equalTo(Layout.monthLabelHeight)
+        }
+
+        previousWeekButton.snp.makeConstraints { make in
             make.top.equalToSuperview()
-            make.leading.equalTo(safeArea)
-            make.trailing.equalTo(safeArea)
+            make.trailing.equalTo(nextWeekButton.snp.leading)
+            make.size.equalTo(Layout.moveWeekButtonSize)
+        }
+
+        nextWeekButton.snp.makeConstraints { make in
+            make.top.equalToSuperview()
+            make.trailing.equalToSuperview()
+            make.size.equalTo(Layout.moveWeekButtonSize)
+        }
+
+        weekHeaderView.snp.makeConstraints { make in
+            make.height.equalTo(Layout.moveWeekButtonSize)
+        }
+
+        weekView.snp.makeConstraints { make in
             make.height.equalTo(Layout.weekViewHeight)
         }
 
+        weekStackView.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(Layout.weekStackViewTopSpacing)
+            make.horizontalEdges.equalToSuperview()
+        }
+
+        routineHeaderView.snp.makeConstraints { make in
+            make.top.equalTo(weekStackView.snp.bottom).offset(Layout.routineHeaderViewTopSpacing)
+            make.horizontalEdges.equalToSuperview()
+            make.height.equalTo(Layout.routineHeaderViewHeight)
+        }
+
+        routineListLabel.snp.makeConstraints { make in
+            make.top.equalToSuperview()
+            make.leading.equalToSuperview().offset(Layout.horizontalMargin)
+            make.centerY.equalToSuperview()
+        }
+
+        routineListButton.snp.makeConstraints { make in
+            make.top.equalToSuperview()
+            make.trailing.equalToSuperview().inset(Layout.horizontalMargin)
+            make.height.equalTo(Layout.routineListButtonHeight)
+        }
+
         routineScrollView.snp.makeConstraints { make in
-            make.top.equalTo(weekView.snp.bottom)
+            make.top.equalTo(routineHeaderView.snp.bottom).offset(Layout.routineScrollViewTopSpacing)
             make.horizontalEdges.equalTo(safeArea)
             make.bottom.equalTo(safeArea)
         }
 
-        routineSortButton.snp.makeConstraints { make in
-            make.top.equalToSuperview()
-            make.trailing.equalTo(safeArea).inset(Layout.routineSortButtonTrailingSpacing)
-            make.size.equalTo(Layout.routineSortButtonSize)
-        }
-
         routineStackView.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(Layout.routineStackViewTopSpacing)
+            make.top.equalToSuperview()
             make.leading.equalTo(safeArea).offset(Layout.horizontalMargin)
             make.trailing.equalTo(safeArea).inset(Layout.horizontalMargin)
             make.bottom.equalToSuperview().inset(Layout.routineStackViewBottomSpacing)
@@ -315,19 +375,8 @@ final class HomeView: BaseViewController<HomeViewModel> {
             make.edges.equalToSuperview()
         }
 
-        deleteAlertView.snp.makeConstraints { make in
-            make.center.equalToSuperview()
-            make.width.equalTo(Layout.deleteAlertViewWidth)
-            make.height.equalTo(Layout.deleteAlertViewHeight)
-        }
-
         loadingIndicatorView.snp.makeConstraints { make in
             make.center.equalToSuperview()
-        }
-
-        toastMessageView.snp.makeConstraints { make in
-            make.centerX.equalToSuperview()
-            make.bottom.equalTo(safeArea.snp.bottom).offset(-Layout.toastMessageBottomSpacing)
         }
     }
 
@@ -335,7 +384,15 @@ final class HomeView: BaseViewController<HomeViewModel> {
         viewModel.output.nicknamePublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] nickname in
-                self?.homeLabel.text = "\(nickname)님,\n오늘 기분 어때요?"
+                self?.nickname = nickname
+            }
+            .store(in: &cancellables)
+
+        viewModel.output.selectedDatePublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] selectedDate in
+                self?.monthLabel.text = selectedDate.convertToString(dateType: .yearMonth)
+                self?.weekView.updateWeekDateViews(date: selectedDate)
             }
             .store(in: &cancellables)
 
@@ -364,20 +421,6 @@ final class HomeView: BaseViewController<HomeViewModel> {
             }
             .store(in: &cancellables)
 
-        viewModel.output.deleteRoutineResultPublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isDeleteRoutine in
-                guard let self else { return }
-                if isDeleteRoutine {
-                    if self.isShowingDeleteAlertView {
-                        self.toggleDeleteAlertView()
-                    }
-                    viewModel.action(input: .refreshSelectedDateRoutine)
-                    hideIndicatorView()
-                }
-            }
-            .store(in: &cancellables)
-
         viewModel.output.updateRoutineCompletionResultPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isUpdateRoutineCompletion in
@@ -389,24 +432,6 @@ final class HomeView: BaseViewController<HomeViewModel> {
             .store(in: &cancellables)
     }
 
-    // 홈 Graident 배경색을 설정합니다.
-    private func configureGradientBackground() {
-        gradientLayer.colors = [
-            BitnagilColor.homeGradientLeft?.cgColor ?? UIColor.systemPink.cgColor,
-            BitnagilColor.homeGradientRight?.cgColor ?? UIColor.blue.cgColor]
-        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
-        gradientLayer.endPoint = CGPoint(x: 1, y: 0.9)
-        view.layer.insertSublayer(gradientLayer, at: 0)
-    }
-
-    // 루틴 정렬 Bottom Sheet를 보여줍니다.
-    private func showRoutineSortBottomSheet() {
-        if !tooltipView.isHidden {
-            hideTooltipView()
-        }
-        presentCustomBottomSheet(contentViewController: routineSortView, maxHeight: Layout.routineSortViewHeight)
-    }
-
     // 해당 날짜의 Routine View를 설정합니다. (없다면 EmptyView)
     private func updateRoutineView(routines: [MainRoutine]) {
         routineStackView.arrangedSubviews.forEach {
@@ -414,12 +439,12 @@ final class HomeView: BaseViewController<HomeViewModel> {
         }
 
         if routines.isEmpty {
+            routineHeaderView.isHidden = true
             routineScrollView.isHidden = true
-            routineSortButton.isHidden = true
             emptyView.isHidden = false
         } else {
+            routineHeaderView.isHidden = false
             routineScrollView.isHidden = false
-            routineSortButton.isHidden = false
             emptyView.isHidden = true
 
             for routine in routines {
@@ -434,25 +459,24 @@ final class HomeView: BaseViewController<HomeViewModel> {
     private func updateEmotionOrbView(emotion: Emotion?) {
         guard
             let emotion,
-            let emotionOrbImageUrl = emotion.emotionImageUrl else {
-            let registerEmotionAction = UIAction(identifier: registerEmotionButtonActionIdentifier) { [weak self] _ in
-                self?.goToEmotionRegisterView()
-            }
-            registerEmotionButton.addAction(registerEmotionAction, for: .touchUpInside)
-            emotionOrbView.image = BitnagilGraphic.defaultEmotionGraphic
+            let emotionOrbImageUrl = emotion.emotionImageUrl,
+            let emotionMessage = emotion.emotionMessage else {
+            let homeLabelText = "\(nickname)님, 오셨군요!\n오늘 기분은 어떤가요?"
+            homeLabel.attributedText = BitnagilFont(
+                family: .cafe24Ssurround,
+                style: .cafe24Title1,
+                weight: .light).attributedString(text: homeLabelText)
+            emotionOrbView.image = BitnagilGraphic.defaultEmotionHandGraphic
+            registerEmotionButton.updateButtonState(buttonState: .default)
             return
         }
+        let homeLabelText = "\(nickname)님,\n\(emotionMessage)"
+        homeLabel.attributedText = BitnagilFont(
+            family: .cafe24Ssurround,
+            style: .cafe24Title1,
+            weight: .light).attributedString(text: homeLabelText)
         emotionOrbView.kf.setImage(with: emotionOrbImageUrl)
-        registerEmotionButton.removeAction(identifiedBy: registerEmotionButtonActionIdentifier, for: .touchUpInside)
-        registerEmotionButton.addAction(
-            UIAction { [weak self] _ in
-                self?.toastMessageView.showToast(
-                    withCheckImage: true,
-                    message: "선택한 감정 구슬이 이미 반영되었어요.",
-                    width: Layout.toastMessageWidth,
-                    height: Layout.toastMessageHeight)
-            },
-            for: .touchUpInside)
+        registerEmotionButton.updateButtonState(buttonState: .disabled)
     }
 
     @objc private func handlePanGesture(_ gesture: UIPanGestureRecognizer) {
@@ -498,10 +522,6 @@ final class HomeView: BaseViewController<HomeViewModel> {
     }
 
     private func toggleFloatingButton() {
-        if !tooltipView.isHidden {
-            hideTooltipView()
-        }
-
         floatingButton.toggle()
         isShowingFloatingMenu.toggle()
 
@@ -514,50 +534,10 @@ final class HomeView: BaseViewController<HomeViewModel> {
         }
     }
 
-    private func toggleDeleteAlertView() {
-        isShowingDeleteAlertView.toggle()
-
-        deleteAlertView.isHidden = !isShowingDeleteAlertView
-        dimmedView.isHidden = !isShowingDeleteAlertView
-
-        if !isShowingDeleteAlertView {
-            viewModel.action(input: .selectRoutine(routine: nil))
-        }
-
-        UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut]) {
-            self.dimmedView.alpha = self.isShowingDeleteAlertView ? 1 : 0
-            self.deleteAlertView.alpha = self.isShowingDeleteAlertView ? 1 : 0
-        }
-    }
-
     @objc private func tappedDimmedView() {
         if isShowingFloatingMenu {
             toggleFloatingButton()
         }
-
-        if isShowingDeleteAlertView {
-            toggleDeleteAlertView()
-        }
-    }
-
-    @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
-        let location = gesture.location(in: view)
-
-        // 탭한 곳이 버튼 영역인 경우
-        if informationButton.frame.contains(location) {
-            hideTooltipView()
-            return
-        }
-
-        // 탭한 곳이 tooltip 영역 밖인 경우
-        if !tooltipView.frame.contains(location) {
-            hideTooltipView()
-        }
-    }
-
-    private func hideTooltipView() {
-        informationButton.isSelected = false
-        tooltipView.hideTooltip()
     }
 
     private func showIndicatorView() {
@@ -587,17 +567,6 @@ extension HomeView: RoutineViewDelegate {
         viewModel.action(input: .updateRoutineCompletion(updatedRoutine: mainRoutine))
     }
 
-    func routineView(_ sender: RoutineView, didTapMainRoutineMoreButton mainRoutine: MainRoutine) {
-        let maxHeight = Layout.routineDetailViewDefaultHeight + CGFloat(mainRoutine.subRoutines.count - 1) * Layout.routineDetailViewSubRoutineHeight
-        let routineDetailView = RoutineDetailView(routine: mainRoutine)
-        routineDetailView.delegate = self
-        bottomSheet = CustomBottomSheet(contentViewController: routineDetailView, maxHeight: maxHeight)
-        if let bottomSheet {
-            present(bottomSheet, animated: true)
-            viewModel.action(input: .selectRoutine(routine: mainRoutine))
-        }
-    }
-
     func routineView(_ sender: RoutineView, didTapSubRoutineCheckButton subRoutine: SubRoutine) {
         showIndicatorView()
         viewModel.action(input: .updateRoutineCompletion(updatedRoutine: subRoutine))
@@ -616,10 +585,6 @@ extension HomeView: SelectableItemTableViewDelegate {
 
 // MARK: WeekViewDelegate
 extension HomeView: WeekViewDelegate {
-    func weekView(_ sender: WeekView, didMoveWeek weekStartDate: Date) {
-        viewModel.action(input: .selectDate(date: weekStartDate))
-    }
-    
     func weekView(_ sender: WeekView, didSelectDate date: Date) {
         viewModel.action(input: .selectDate(date: date))
     }
@@ -635,47 +600,5 @@ extension HomeView: FloatingMenuViewDelegate {
         let routineCreationView = RoutineCreationView(viewModel: routineCreationViewModel)
         routineCreationView.hidesBottomBarWhenPushed = true
         self.navigationController?.pushViewController(routineCreationView, animated: true)
-    }
-}
-
-// MARK: RoutineDetailViewDelegate
-extension HomeView: RoutineDetailViewDelegate {
-    func routineDetailView(_ sender: RoutineDetailView, didEditRoutine routine: MainRoutine) {
-        if let bottomSheet {
-            bottomSheet.dismissBottomSheet()
-            self.bottomSheet = nil
-        }
-        guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self) else {
-            fatalError("routineCreationViewModel 의존성이 등록되지 않았습니다.")
-        }
-        let routineCreationView = RoutineCreationView(viewModel: routineCreationViewModel, routineId: routine.id)
-        routineCreationView.hidesBottomBarWhenPushed = true
-        self.navigationController?.pushViewController(routineCreationView, animated: true)
-    }
-    
-    func routineDetailView(_ sender: RoutineDetailView, didDeleteRoutine routine: MainRoutine) {
-        if let bottomSheet {
-            bottomSheet.dismissBottomSheet()
-            self.bottomSheet = nil
-        }
-
-        if routine.repeatDay.isEmpty {
-            viewModel.action(input: .deleteDailyRoutine)
-        } else {
-            toggleDeleteAlertView()
-        }
-    }
-}
-
-// MARK: RoutineDeleteAlertViewDelegate
-extension HomeView: RoutineDeleteAlertViewDelegate {
-    func routineDeleteAlertViewDidTapDeleteAllRoutine(_ sender: RoutineDeleteAlertView) {
-        showIndicatorView()
-        viewModel.action(input: .deleteAllRoutine)
-    }
-    
-    func routineDeleteAlertViewDidTapDeleteDailyRoutine(_ sender: RoutineDeleteAlertView) {
-        showIndicatorView()
-        viewModel.action(input: .deleteDailyRoutine)
     }
 }
