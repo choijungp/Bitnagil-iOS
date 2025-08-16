@@ -8,21 +8,22 @@
 import SnapKit
 import UIKit
 
-protocol DatePickerViewDelegate: AnyObject {
-    func datePickerView(_ pickerView: DatePickerView, didSelectTime time: Date)
+protocol TimePickerViewDelegate: AnyObject {
+    func timePickerView(_ sender: TimePickerView, didSelectTime time: Date)
 }
 
-final class DatePickerView: UIViewController {
+final class TimePickerView: UIViewController {
     private enum Layout {
         static let datePickerHeight: CGFloat = 195
         static let horizontalSpacing: CGFloat = 20
         static let registerButtonHeight: CGFloat = 54
-        static let registerButtonVerticalSpacing: CGFloat = 14
+        static let registerButtonTopSpacing: CGFloat = 36
+        static let registerButtonBottomSpacing: CGFloat = 14
     }
 
     private let datePicker = UIDatePicker()
     private let registerButton = UIButton()
-    weak var delegate: DatePickerViewDelegate?
+    weak var delegate: TimePickerViewDelegate?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -33,20 +34,20 @@ final class DatePickerView: UIViewController {
     private func configureAttribute() {
         datePicker.preferredDatePickerStyle = .wheels
         datePicker.datePickerMode = .time
-        datePicker.locale = Locale(identifier: "en_US")
+
         datePicker.backgroundColor = .white
         datePicker.tintColor = .black
 
         registerButton.layer.cornerRadius = 12
         registerButton.layer.masksToBounds = true
-        registerButton.backgroundColor = BitnagilColor.navy500
+        registerButton.backgroundColor = BitnagilColor.gray10
         registerButton.titleLabel?.font = BitnagilFont.init(style: .body1, weight: .semiBold).font
-        registerButton.setTitle("등록하기", for: .normal)
+        registerButton.setTitle("확인", for: .normal)
         registerButton.setTitleColor(.white, for: .normal)
         registerButton.addAction(
             UIAction { [weak self] _ in
                 guard let self else { return }
-                self.delegate?.datePickerView(self, didSelectTime: datePicker.date)
+                self.delegate?.timePickerView(self, didSelectTime: datePicker.date)
                 dismiss(animated: true)
             },
             for: .touchUpInside)
@@ -59,14 +60,15 @@ final class DatePickerView: UIViewController {
 
         datePicker.snp.makeConstraints { make in
             make.top.horizontalEdges.equalToSuperview()
-            make.height.equalTo(Layout.datePickerHeight)
+            make.height.equalTo(Layout.datePickerHeight).priority(.medium)
         }
 
         registerButton.snp.makeConstraints { make in
             make.horizontalEdges.equalToSuperview().inset(Layout.horizontalSpacing)
-            make.top.equalTo(datePicker.snp.bottom).offset(Layout.registerButtonVerticalSpacing)
-            make.bottom.equalTo(safeArea.snp.bottom).offset(-Layout.registerButtonVerticalSpacing)
+            make.top.equalTo(datePicker.snp.bottom).offset(Layout.registerButtonTopSpacing)
+            make.bottom.equalTo(safeArea.snp.bottom).offset(-Layout.registerButtonBottomSpacing)
             make.height.equalTo(Layout.registerButtonHeight)
         }
+
     }
 }
