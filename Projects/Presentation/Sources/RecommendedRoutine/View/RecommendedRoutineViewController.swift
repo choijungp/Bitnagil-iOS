@@ -1,5 +1,5 @@
 //
-//  RecommendedRoutineView.swift
+//  RecommendedRoutineViewController.swift
 //  Presentation
 //
 //  Created by 최정인 on 7/12/25.
@@ -11,22 +11,23 @@ import Shared
 import SnapKit
 import UIKit
 
-final class RecommendedRoutineView: BaseViewController<RecommendedRoutineViewModel> {
-
+final class RecommendedRoutineViewController: BaseViewController<RecommendedRoutineViewModel> {
     private enum Layout {
         static let horizontalMargin: CGFloat = 20
         static let bottomSheetHeight: CGFloat = 226
-        static let categoryViewTopSpacing: CGFloat = 16
+        static let categoryViewTopSpacing: CGFloat = 70
         static let categoryViewHeight: CGFloat = 36
         static let headerStackViewTrailingSpacing: CGFloat = 8
-        static let headerStackViewTopSpacing: CGFloat = 18
+        static let headerStackViewTopSpacing: CGFloat = 20
+        static let headerStackViewTopMaxSpacing: CGFloat = 24
         static let headerStackViewHeight: CGFloat = 40
         static let recommendedRoutineStackViewSpacing: CGFloat = 12
         static let recommendedRoutineScrollViewTopSpacing: CGFloat = 12
         static let recommendedRoutineScrollViewBottomSpacing: CGFloat = 10
         static let recommendedRoutineStackViewBottomSpacing: CGFloat = 50
         static let routineCardHeight: CGFloat = 80
-        static let registerEmotionButtonHeight: CGFloat = 52
+        static let registerEmotionButtonTopSpacing: CGFloat = 20
+        static let registerEmotionButtonHeight: CGFloat = 66
         static let floatingButtonBottomSpacing: CGFloat = 19
         static let floatingButtonSize: CGFloat = 52
         static let floatingMenuBottomSpacing: CGFloat = 15
@@ -44,17 +45,16 @@ final class RecommendedRoutineView: BaseViewController<RecommendedRoutineViewMod
     private let recommendedRoutineScrollView = UIScrollView()
     private let recommendedRoutineStackView = UIStackView()
     private var recommendedRoutineCards: [Int: RecommendedRoutineCardView] = [:]
-    private let registerEmotionButton = RegisterEmotionButton()
+    private let registerEmotionButton = RegisterEmotionButtonView()
+    private let recommendedRoutineEmptyView = RecommendedRoutineEmptyView()
 
     private var isExistEmotion: Bool = false
     private var isShowingFloatingMenu: Bool = false
     private let dimmedView = UIView()
     private let floatingButton = FloatingButton()
     private let floatingMenu = FloatingMenuView()
-
-    private let toastMessageView = ToastMessageView()
-
     private var cancellables: Set<AnyCancellable>
+
     public override init(viewModel: RecommendedRoutineViewModel) {
         cancellables = []
         super.init(viewModel: viewModel)
@@ -71,12 +71,11 @@ final class RecommendedRoutineView: BaseViewController<RecommendedRoutineViewMod
     }
 
     override func configureAttribute() {
-        title = "추천 루틴"
         categoryView.delegate = self
 
-        routineLabel.text = "루틴 목록"
-        routineLabel.font = BitnagilFont(style: .body1, weight: .semiBold).font
-        routineLabel.textColor = BitnagilColor.gray10
+        routineLabel.text = "추천 루틴리스트"
+        routineLabel.font = BitnagilFont(style: .body2, weight: .semiBold).font
+        routineLabel.textColor = BitnagilColor.gray60
 
         headerStackView.axis = .horizontal
 
@@ -91,14 +90,7 @@ final class RecommendedRoutineView: BaseViewController<RecommendedRoutineViewMod
         recommendedRoutineStackView.axis = .vertical
         recommendedRoutineStackView.spacing = Layout.recommendedRoutineStackViewSpacing
 
-        registerEmotionButton.addAction(UIAction { _ in
-            guard let emotionRegisterViewModel = DIContainer.shared.resolve(type: EmotionRegisterViewModel.self) else {
-                fatalError("emotionRegisterViewModel 의존성이 등록되지 않았습니다.")
-            }
-            let emotionRegisterView = EmotionRegisterView(viewModel: emotionRegisterViewModel)
-            emotionRegisterView.hidesBottomBarWhenPushed = true
-            self.navigationController?.pushViewController(emotionRegisterView, animated: true)
-        }, for: .touchUpInside)
+        registerEmotionButton.delegate = self
 
         floatingButton.addAction(UIAction { [weak self] _ in
             self?.toggleFloatingButton()
@@ -113,25 +105,29 @@ final class RecommendedRoutineView: BaseViewController<RecommendedRoutineViewMod
 
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(tappedDimmedView))
         dimmedView.addGestureRecognizer(tapGesture)
+
+        recommendedRoutineEmptyView.isHidden = true
     }
 
     override func configureLayout() {
         let safeArea = view.safeAreaLayoutGuide
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = BitnagilColor.gray99
+        navigationController?.setNavigationBarHidden(true, animated: false)
+        configureCustomNavigationBar(navigationBarStyle: .withTitle(title: "추천 루틴"), backgroundColor: BitnagilColor.gray99)
 
         view.addSubview(categoryView)
+        view.addSubview(registerEmotionButton)
         view.addSubview(headerStackView)
         [routineLabel, levelButton].forEach {
             headerStackView.addArrangedSubview($0)
         }
+        view.addSubview(recommendedRoutineEmptyView)
         view.addSubview(recommendedRoutineScrollView)
         recommendedRoutineScrollView.addSubview(recommendedRoutineStackView)
 
         view.addSubview(dimmedView)
         view.addSubview(floatingMenu)
         view.addSubview(floatingButton)
-
-        view.addSubview(toastMessageView)
 
         categoryView.snp.makeConstraints { make in
             make.leading.equalTo(safeArea)
@@ -140,10 +136,17 @@ final class RecommendedRoutineView: BaseViewController<RecommendedRoutineViewMod
             make.height.equalTo(Layout.categoryViewHeight)
         }
 
+        registerEmotionButton.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(Layout.horizontalMargin)
+            make.trailing.equalToSuperview().inset(Layout.horizontalMargin)
+            make.top.equalTo(categoryView.snp.bottom).offset(Layout.registerEmotionButtonTopSpacing)
+            make.height.equalTo(Layout.registerEmotionButtonHeight)
+        }
+
         headerStackView.snp.makeConstraints { make in
             make.leading.equalTo(safeArea).offset(Layout.horizontalMargin)
             make.trailing.equalTo(safeArea).inset(Layout.headerStackViewTrailingSpacing)
-            make.top.equalTo(categoryView.snp.bottom).offset(Layout.headerStackViewTopSpacing)
+            make.top.equalTo(registerEmotionButton.snp.bottom).offset(Layout.headerStackViewTopSpacing)
             make.height.equalTo(Layout.headerStackViewHeight)
         }
 
@@ -153,6 +156,11 @@ final class RecommendedRoutineView: BaseViewController<RecommendedRoutineViewMod
 
         levelButton.snp.makeConstraints { make in
             make.trailing.equalTo(headerStackView)
+        }
+
+        recommendedRoutineEmptyView.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.centerY.equalToSuperview().offset(Layout.headerStackViewHeight)
         }
 
         recommendedRoutineScrollView.snp.makeConstraints { make in
@@ -184,19 +192,14 @@ final class RecommendedRoutineView: BaseViewController<RecommendedRoutineViewMod
         dimmedView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
-
-        toastMessageView.snp.makeConstraints { make in
-            make.centerX.equalToSuperview()
-            make.bottom.equalTo(safeArea.snp.bottom).offset(-Layout.toastMessageBottomSpacing)
-        }
     }
 
     override func bind() {
         viewModel.output.selectedCategoryPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] selectedCategory in
-                self?.showEmotionButton(isShowEmotionButton: selectedCategory == .recommendation)
                 self?.categoryView.updateSelectedCategory(selectedCategory: selectedCategory)
+                self?.showEmotionButton(isShowEmotionButton: selectedCategory == .recommendation)
             }
             .store(in: &cancellables)
 
@@ -212,7 +215,7 @@ final class RecommendedRoutineView: BaseViewController<RecommendedRoutineViewMod
             .sink { [weak self] isExistEmotion in
                 if isExistEmotion {
                     self?.isExistEmotion = isExistEmotion
-                    self?.registerEmotionButton.isHidden = true
+                    self?.showEmotionButton(isShowEmotionButton: false)
                 }
             }
             .store(in: &cancellables)
@@ -228,6 +231,9 @@ final class RecommendedRoutineView: BaseViewController<RecommendedRoutineViewMod
         }
         recommendedRoutineCards.removeAll()
 
+//        let testView = RoutineCardView()
+//        recommendedRoutineStackView.addArrangedSubview(testView)
+        recommendedRoutineEmptyView.isHidden = !recommendedRoutines.isEmpty
         for routine in recommendedRoutines {
             let routineCard = RecommendedRoutineCardView(recommendedRoutine: routine)
             recommendedRoutineCards[routine.id] = routineCard
@@ -249,24 +255,20 @@ final class RecommendedRoutineView: BaseViewController<RecommendedRoutineViewMod
 
     // 감정 등록 버튼을 보이거나 숨겨줍니다.
     private func showEmotionButton(isShowEmotionButton: Bool) {
-        guard !isExistEmotion else {
-            registerEmotionButton.isHidden = true
-            return
-        }
-        
-        guard isShowEmotionButton else {
-            registerEmotionButton.isHidden = true
-            return
-        }
-        guard !recommendedRoutineStackView.arrangedSubviews.contains(registerEmotionButton) else {
-            registerEmotionButton.isHidden = false
-            return
-        }
+        let safeArea = view.safeAreaLayoutGuide
+        let showingEmotionButton = isShowEmotionButton && !isExistEmotion
+        registerEmotionButton.isHidden = !showingEmotionButton
 
-        recommendedRoutineStackView.addArrangedSubview(registerEmotionButton)
-        registerEmotionButton.snp.makeConstraints { make in
-            make.leading.trailing.equalToSuperview()
-            make.height.equalTo(Layout.registerEmotionButtonHeight)
+        headerStackView.snp.remakeConstraints { make in
+            make.leading.equalTo(safeArea).offset(Layout.horizontalMargin)
+            make.trailing.equalTo(safeArea).inset(Layout.headerStackViewTrailingSpacing)
+            make.height.equalTo(Layout.headerStackViewHeight)
+
+            if showingEmotionButton {
+                make.top.equalTo(registerEmotionButton.snp.bottom).offset(Layout.headerStackViewTopSpacing)
+            } else {
+                make.top.equalTo(categoryView.snp.bottom).offset(Layout.headerStackViewTopMaxSpacing)
+            }
         }
     }
 
@@ -290,18 +292,17 @@ final class RecommendedRoutineView: BaseViewController<RecommendedRoutineViewMod
 }
 
 // MARK: RoutineCategoryViewDelegate
-extension RecommendedRoutineView: RoutineCategoryViewDelegate {
+extension RecommendedRoutineViewController: RoutineCategoryViewDelegate {
     func routineCategoryView(_ sender: RoutineCategoryView, didSelectCategory category: RoutineCategoryType) {
         viewModel.action(input: .selectCategory(selectedCategory: category))
     }
 }
 
 // MARK: RecommendedRoutineCardViewDelegate
-extension RecommendedRoutineView: RecommendedRoutineCardViewDelegate {
+extension RecommendedRoutineViewController: RecommendedRoutineCardViewDelegate {
     func recommendedRoutineCardView(_ sender: RecommendedRoutineCardView, didTapRecommendedRoutine routine: RecommendedRoutine) {
-        guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self) else {
-            fatalError("routineCreationViewModel 의존성이 등록되지 않았습니다.")
-        }
+        guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self)
+        else { fatalError("routineCreationViewModel 의존성이 등록되지 않았습니다.") }
 
         let routineCreationView = RoutineCreationViewController(viewModel: routineCreationViewModel, recommendRoutineId: routine.id)
         routineCreationView.hidesBottomBarWhenPushed = true
@@ -310,7 +311,7 @@ extension RecommendedRoutineView: RecommendedRoutineCardViewDelegate {
 }
 
 // MARK: SelectableItemTableViewDelegate
-extension RecommendedRoutineView: SelectableItemTableViewDelegate {
+extension RecommendedRoutineViewController: SelectableItemTableViewDelegate {
     func selectableItemTableView<T: SelectableItem & CaseIterable & Equatable>(_ sender: SelectableItemTableView<T>, didSelectItem: T?) {
         guard let didSelectLevel = didSelectItem as? RoutineLevelType?
         else { return }
@@ -320,14 +321,25 @@ extension RecommendedRoutineView: SelectableItemTableViewDelegate {
 }
 
 // MARK: FloatingMenuViewDelegate
-extension RecommendedRoutineView: FloatingMenuViewDelegate {
+extension RecommendedRoutineViewController: FloatingMenuViewDelegate {
     func floatingMenuDidTapRegisterRoutineButton(_ sender: FloatingMenuView) {
         toggleFloatingButton()
-        guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self) else {
-            fatalError("routineCreationViewModel 의존성이 등록되지 않았습니다.")
-        }
+        guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self)
+        else { fatalError("routineCreationViewModel 의존성이 등록되지 않았습니다.") }
+        
         let routineCreationView = RoutineCreationViewController(viewModel: routineCreationViewModel)
         routineCreationView.hidesBottomBarWhenPushed = true
         self.navigationController?.pushViewController(routineCreationView, animated: true)
+    }
+}
+
+extension RecommendedRoutineViewController: RegisterEmotionButtonViewDelegate {
+    func registerEmotionButtonViewDidTapRegisterButton(_ sender: RegisterEmotionButtonView) {
+        guard let emotionRegisterViewModel = DIContainer.shared.resolve(type: EmotionRegisterViewModel.self)
+        else { fatalError("emotionRegisterViewModel 의존성이 등록되지 않았습니다.") }
+
+        let emotionRegisterView = EmotionRegisterView(viewModel: emotionRegisterViewModel)
+        emotionRegisterView.hidesBottomBarWhenPushed = true
+        self.navigationController?.pushViewController(emotionRegisterView, animated: true)
     }
 }
