@@ -34,7 +34,7 @@ final class RoutineCreationViewController: BaseViewController<RoutineCreationVie
 
     private let scrollView = UIScrollView()
     private let contentView = UIView()
-    private let routineTextField = UITextField()
+    private let nameTextField = UITextField()
     private let textViewUnderLineView = UIView()
     private let clearButton = UIButton()
     private var dateSelectionType: DateSelectionType?
@@ -69,13 +69,19 @@ final class RoutineCreationViewController: BaseViewController<RoutineCreationVie
     private let registerButtonTitle: String
     private var cancellables = Set<AnyCancellable>()
 
-    init(viewModel: RoutineCreationViewModel, routineId: String? = nil) {
-        navigationTitle = routineId == nil ? "루틴 등록" : "루틴 수정"
-        registerButtonTitle = routineId == nil ? "등록하기" : "수정하기"
+    init(
+        viewModel: RoutineCreationViewModel,
+        updateInfo: (routineId: String, updateType: RoutineUpdateApplyDateType)? = nil
+    ) {
+        navigationTitle = updateInfo?.routineId == nil ? "루틴 등록" : "루틴 수정"
+        registerButtonTitle = updateInfo?.routineId == nil ? "등록하기" : "수정하기"
 
         super.init(viewModel: viewModel)
-        if let routineId {
-            viewModel.action(input: .fetchRoutine(id: routineId))
+
+        registerButton.setTitle(registerButtonTitle, for: .normal)
+        if let updateInfo {
+            viewModel.action(input: .fetchRoutine(id: updateInfo.routineId))
+            viewModel.action(input: .configureUpdateType(updateType: updateInfo.updateType))
         }
     }
 
@@ -84,6 +90,8 @@ final class RoutineCreationViewController: BaseViewController<RoutineCreationVie
         registerButtonTitle = "등록하기"
 
         super.init(viewModel: viewModel)
+
+        registerButton.setTitle(registerButtonTitle, for: .normal)
         viewModel.action(input: .fetchRecommendedRoutine(id: recommendRoutineId))
     }
 
@@ -103,17 +111,17 @@ final class RoutineCreationViewController: BaseViewController<RoutineCreationVie
 
         view.backgroundColor = .white
 
-        routineTextField.attributedPlaceholder = NSAttributedString(string: "루틴 제목을 입력해주세요.", attributes: attributes)
-        routineTextField.font = BitnagilFont(style: .title3, weight: .semiBold).font
-        routineTextField.textColor = BitnagilColor.gray10
-        routineTextField.addTarget(self, action: #selector(textFieldEditingChanged(_:)), for: .editingChanged)
-        routineTextField.delegate = self
+        nameTextField.attributedPlaceholder = NSAttributedString(string: "루틴 제목을 입력해주세요.", attributes: attributes)
+        nameTextField.font = BitnagilFont(style: .title3, weight: .semiBold).font
+        nameTextField.textColor = BitnagilColor.gray10
+        nameTextField.addTarget(self, action: #selector(textFieldEditingChanged(_:)), for: .editingChanged)
+        nameTextField.delegate = self
         textViewUnderLineView.backgroundColor = BitnagilColor.gray90
 
         clearButton.setImage(BitnagilIcon.clearIcon, for: .normal)
         clearButton.addAction(
             UIAction { [weak self] _ in
-                self?.routineTextField.text = ""
+                self?.nameTextField.text = ""
                 self?.viewModel.action(input: .configureName(name: ""))
             },
             for: .touchUpInside)
@@ -121,9 +129,11 @@ final class RoutineCreationViewController: BaseViewController<RoutineCreationVie
         registerButton.layer.cornerRadius = 12
         registerButton.layer.masksToBounds = true
         registerButton.titleLabel?.font = BitnagilFont.init(style: .body1, weight: .semiBold).font
-        registerButton.backgroundColor = BitnagilColor.gray95
-        registerButton.setTitle("등록하기", for: .normal)
-
+        registerButton.addAction(
+            UIAction { [weak self] _ in
+                self?.viewModel.action(input: .registerRoutine)
+            },
+            for: .touchUpInside)
         bindCreationCardViews()
     }
 
@@ -133,7 +143,7 @@ final class RoutineCreationViewController: BaseViewController<RoutineCreationVie
 
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
-        contentView.addSubview(routineTextField)
+        contentView.addSubview(nameTextField)
         contentView.addSubview(clearButton)
         contentView.addSubview(textViewUnderLineView)
         contentView.addSubview(subRoutineNameView)
@@ -152,7 +162,7 @@ final class RoutineCreationViewController: BaseViewController<RoutineCreationVie
             make.height.equalTo(scrollView.frameLayoutGuide).priority(.low)
         }
 
-        routineTextField.snp.makeConstraints { make in
+        nameTextField.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(Layout.textFieldTopSpacing)
             make.horizontalEdges.equalToSuperview().inset(Layout.horizontalSpacing)
             make.height.equalTo(Layout.textFieldHeight)
@@ -160,12 +170,12 @@ final class RoutineCreationViewController: BaseViewController<RoutineCreationVie
 
         clearButton.snp.makeConstraints { make in
             make.trailing.equalToSuperview().offset(-Layout.horizontalSpacing)
-            make.centerY.equalTo(routineTextField)
+            make.centerY.equalTo(nameTextField)
             make.size.equalTo(Layout.clearButtonSize)
         }
 
         textViewUnderLineView.snp.makeConstraints { make in
-            make.top.equalTo(routineTextField.snp.bottom).offset(Layout.textFieldUnderLineTopSpacing)
+            make.top.equalTo(nameTextField.snp.bottom).offset(Layout.textFieldUnderLineTopSpacing)
             make.horizontalEdges.equalToSuperview().inset(Layout.horizontalSpacing)
             make.height.equalTo(Layout.textFieldUnderLineHeight)
         }
@@ -199,10 +209,17 @@ final class RoutineCreationViewController: BaseViewController<RoutineCreationVie
     }
 
     override func bind() {
+        viewModel.output.namePublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] name in
+                self?.nameTextField.text = name
+            }
+            .store(in: &cancellables)
+
         viewModel.output.subRoutinesPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] subroutines in
-                self?.subRoutineNameView.configure(dependencies: .init(subRoutines: subroutines))
+                self?.subRoutineNameView.configure(dependency: .init(subRoutines: subroutines))
                 self?.subRoutineNameView.configure(subTitles: subroutines.filter { !$0.isEmpty })
             }
             .store(in: &cancellables)
@@ -211,7 +228,7 @@ final class RoutineCreationViewController: BaseViewController<RoutineCreationVie
             .receive(on: DispatchQueue.main)
             .sink { [weak self] repeatType in
                 guard let repeatType else {
-                    self?.repeatView.configure(dependencies: .init(repeatType: .none))
+                    self?.repeatView.configure(dependency: .init(repeatType: .none))
                     self?.repeatView.configure(subTitles: [])
                     return
                 }
@@ -221,14 +238,14 @@ final class RoutineCreationViewController: BaseViewController<RoutineCreationVie
                     let subTitle = Week.allCases
                         .map { $0.koreanValue }
                         .joined(separator: ",")
-                    self?.repeatView.configure(dependencies: .init(repeatType: .daily))
+                    self?.repeatView.configure(dependency: .init(repeatType: .daily))
                     self?.repeatView.configure(subTitles: ["매주 \(subTitle)"])
                 case .weekly(let weeks):
                     let subTitle = weeks
                         .sorted(by: { $0.id < $1.id })
                         .map { $0.koreanValue }
                         .joined(separator: ",")
-                    self?.repeatView.configure(dependencies: .init(repeatType: .weekly(weeks: weeks)))
+                    self?.repeatView.configure(dependency: .init(repeatType: .weekly(weeks: weeks)))
                     self?.repeatView.configure(subTitles: weeks.isEmpty ? [] : ["매주 \(subTitle)"])
                 }
             }
@@ -237,20 +254,35 @@ final class RoutineCreationViewController: BaseViewController<RoutineCreationVie
         viewModel.output.periodPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] (start, end) in
-                self?.periodView.configure(dependencies: .init(dates: (start, end)))
+                self?.periodView.configure(dependency: .init(dates: (start, end)))
             }
             .store(in: &cancellables)
 
         viewModel.output.executionTimePublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] startAt in
-                self?.timeView.configure(dependencies: .init(startTime: startAt))
+                self?.timeView.configure(dependency: .init(startTime: startAt))
 
                 if let startAt {
                     let timeString = startAt.isMidnight ? "하루 종일" : startAt.convertToString(dateType: .amPmTime)
                     self?.timeView.configure(subTitles: [timeString])
                 } else {
                     self?.timeView.configure(subTitles: [])
+                }
+            }
+            .store(in: &cancellables)
+
+        viewModel.output.isRoutineValid
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isRoutineValid in
+                if isRoutineValid {
+                    self?.registerButton.isEnabled = true
+                    self?.registerButton.backgroundColor = BitnagilColor.gray10
+                    self?.registerButton.setTitleColor(.white, for: .normal)
+                } else {
+                    self?.registerButton.isEnabled = false
+                    self?.registerButton.backgroundColor = BitnagilColor.gray95
+                    self?.registerButton.setTitleColor(.white, for: .normal)
                 }
             }
             .store(in: &cancellables)
