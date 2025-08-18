@@ -9,6 +9,10 @@ import Domain
 import SnapKit
 import UIKit
 
+protocol RoutineCardViewDelegate: AnyObject {
+    func routineCardView(_ sender: RoutineCardView, didTapPlusButton routine: RecommendedRoutine)
+}
+
 final class RoutineCardView: UIView {
     private enum Layout {
         static let horizontalMargin: CGFloat = 16
@@ -29,7 +33,7 @@ final class RoutineCardView: UIView {
     }
 
     private let headerInfoStackView = UIStackView()
-    private let categoryIconView = RoutineCategoryIcon(routineCategory: .connection)
+    private lazy var categoryIconView = RoutineCategoryIcon(routineCategory: routine.routineType)
     private let titleLabel = UILabel()
     private let editButton = UIButton()
     private let deleteButton = UIButton()
@@ -38,7 +42,10 @@ final class RoutineCardView: UIView {
     private let subRoutineLabel = UILabel()
     private let subRoutineStackView = UIStackView()
 
-    init() {
+    private let routine: RecommendedRoutine
+    weak var delegate: RoutineCardViewDelegate?
+    init(routine: RecommendedRoutine) {
+        self.routine = routine
         super.init(frame: .zero)
         configureAttribute()
         configureLayout()
@@ -56,7 +63,7 @@ final class RoutineCardView: UIView {
         headerInfoStackView.axis = .horizontal
         headerInfoStackView.spacing = Layout.headerInfoStackViewSpacing
 
-        titleLabel.text = "개운하게 일어나기"
+        titleLabel.text = routine.mainTitle
         titleLabel.font = BitnagilFont(style: .body1, weight: .semiBold).font
         titleLabel.textColor = BitnagilColor.gray10
 
@@ -64,6 +71,11 @@ final class RoutineCardView: UIView {
             .resizeAspectFit(to: CGSize(width: Layout.plusImageSize, height: Layout.plusImageSize))
         plusButton.setImage(plusImage, for: .normal)
         plusButton.tintColor = BitnagilColor.gray10
+        plusButton.addAction(
+            UIAction { [weak self] _ in
+                guard let self else { return }
+                delegate?.routineCardView(self, didTapPlusButton: routine)
+            }, for: .touchUpInside)
 
         grayLine.backgroundColor = BitnagilColor.gray97
 
@@ -78,7 +90,7 @@ final class RoutineCardView: UIView {
         }
         subRoutineStackView.addArrangedSubview(subRoutineLabel)
 
-        ["물 마시기", "물 마시기", "물 마시기"].forEach {
+        routine.subRoutines.forEach {
             let subRoutineTitleLabel = UILabel()
             subRoutineTitleLabel.text = "• \($0)"
             subRoutineTitleLabel.font = BitnagilFont(style: .body2, weight: .medium).font

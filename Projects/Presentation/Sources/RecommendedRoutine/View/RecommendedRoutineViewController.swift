@@ -23,8 +23,7 @@ final class RecommendedRoutineViewController: BaseViewController<RecommendedRout
         static let headerStackViewHeight: CGFloat = 40
         static let recommendedRoutineStackViewSpacing: CGFloat = 12
         static let recommendedRoutineScrollViewTopSpacing: CGFloat = 12
-        static let recommendedRoutineScrollViewBottomSpacing: CGFloat = 10
-        static let recommendedRoutineStackViewBottomSpacing: CGFloat = 50
+        static let recommendedRoutineStackViewBottomSpacing: CGFloat = 65
         static let routineCardHeight: CGFloat = 80
         static let registerEmotionButtonTopSpacing: CGFloat = 20
         static let registerEmotionButtonHeight: CGFloat = 66
@@ -44,7 +43,7 @@ final class RecommendedRoutineViewController: BaseViewController<RecommendedRout
 
     private let recommendedRoutineScrollView = UIScrollView()
     private let recommendedRoutineStackView = UIStackView()
-    private var recommendedRoutineCards: [Int: RecommendedRoutineCardView] = [:]
+    private var recommendedRoutineCards: [Int: RoutineCardView] = [:]
     private let registerEmotionButton = RegisterEmotionButtonView()
     private let recommendedRoutineEmptyView = RecommendedRoutineEmptyView()
 
@@ -167,7 +166,7 @@ final class RecommendedRoutineViewController: BaseViewController<RecommendedRout
             make.leading.equalTo(safeArea).offset(Layout.horizontalMargin)
             make.trailing.equalTo(safeArea).inset(Layout.horizontalMargin)
             make.top.equalTo(headerStackView.snp.bottom).offset(Layout.recommendedRoutineScrollViewTopSpacing)
-            make.bottom.equalTo(safeArea).inset(Layout.recommendedRoutineScrollViewBottomSpacing)
+            make.bottom.equalTo(safeArea)
         }
 
         recommendedRoutineStackView.snp.makeConstraints { make in
@@ -200,6 +199,7 @@ final class RecommendedRoutineViewController: BaseViewController<RecommendedRout
             .sink { [weak self] selectedCategory in
                 self?.categoryView.updateSelectedCategory(selectedCategory: selectedCategory)
                 self?.showEmotionButton(isShowEmotionButton: selectedCategory == .recommendation)
+                self?.recommendedRoutineScrollView.setContentOffset(CGPoint(x: 0, y: 0), animated: true)
             }
             .store(in: &cancellables)
 
@@ -231,17 +231,12 @@ final class RecommendedRoutineViewController: BaseViewController<RecommendedRout
         }
         recommendedRoutineCards.removeAll()
 
-//        let testView = RoutineCardView()
-//        recommendedRoutineStackView.addArrangedSubview(testView)
         recommendedRoutineEmptyView.isHidden = !recommendedRoutines.isEmpty
         for routine in recommendedRoutines {
-            let routineCard = RecommendedRoutineCardView(recommendedRoutine: routine)
-            recommendedRoutineCards[routine.id] = routineCard
-            recommendedRoutineStackView.addArrangedSubview(routineCard)
-            routineCard.delegate = self
-            routineCard.snp.makeConstraints { make in
-                make.height.equalTo(Layout.routineCardHeight)
-            }
+            let routineCardView = RoutineCardView(routine: routine)
+            recommendedRoutineCards[routine.id] = routineCardView
+            routineCardView.delegate = self
+            recommendedRoutineStackView.addArrangedSubview(routineCardView)
         }
     }
 
@@ -298,18 +293,6 @@ extension RecommendedRoutineViewController: RoutineCategoryViewDelegate {
     }
 }
 
-// MARK: RecommendedRoutineCardViewDelegate
-extension RecommendedRoutineViewController: RecommendedRoutineCardViewDelegate {
-    func recommendedRoutineCardView(_ sender: RecommendedRoutineCardView, didTapRecommendedRoutine routine: RecommendedRoutine) {
-        guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self)
-        else { fatalError("routineCreationViewModel 의존성이 등록되지 않았습니다.") }
-
-        let routineCreationView = RoutineCreationViewController(viewModel: routineCreationViewModel, recommendRoutineId: routine.id)
-        routineCreationView.hidesBottomBarWhenPushed = true
-        self.navigationController?.pushViewController(routineCreationView, animated: true)
-    }
-}
-
 // MARK: SelectableItemTableViewDelegate
 extension RecommendedRoutineViewController: SelectableItemTableViewDelegate {
     func selectableItemTableView<T: SelectableItem & CaseIterable & Equatable>(_ sender: SelectableItemTableView<T>, didSelectItem: T?) {
@@ -317,6 +300,7 @@ extension RecommendedRoutineViewController: SelectableItemTableViewDelegate {
         else { return }
         viewModel.action(input: .selectLevel(selectedLevel: didSelectLevel))
         levelButton.updateButton(level: didSelectLevel)
+        recommendedRoutineScrollView.setContentOffset(CGPoint(x: 0, y: 0), animated: true)
     }
 }
 
@@ -333,6 +317,7 @@ extension RecommendedRoutineViewController: FloatingMenuViewDelegate {
     }
 }
 
+// MARK: RegisterEmotionButtonViewDelegate
 extension RecommendedRoutineViewController: RegisterEmotionButtonViewDelegate {
     func registerEmotionButtonViewDidTapRegisterButton(_ sender: RegisterEmotionButtonView) {
         guard let emotionRegisterViewModel = DIContainer.shared.resolve(type: EmotionRegisterViewModel.self)
@@ -341,5 +326,17 @@ extension RecommendedRoutineViewController: RegisterEmotionButtonViewDelegate {
         let emotionRegisterView = EmotionRegisterView(viewModel: emotionRegisterViewModel)
         emotionRegisterView.hidesBottomBarWhenPushed = true
         self.navigationController?.pushViewController(emotionRegisterView, animated: true)
+    }
+}
+
+// MARK: RoutineCardViewDelegate
+extension RecommendedRoutineViewController: RoutineCardViewDelegate {
+    func routineCardView(_ sender: RoutineCardView, didTapPlusButton routine: RecommendedRoutine) {
+        guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self)
+        else { fatalError("routineCreationViewModel 의존성이 등록되지 않았습니다.") }
+
+        let routineCreationView = RoutineCreationViewController(viewModel: routineCreationViewModel, recommendRoutineId: routine.id)
+        routineCreationView.hidesBottomBarWhenPushed = true
+        self.navigationController?.pushViewController(routineCreationView, animated: true)
     }
 }
