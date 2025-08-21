@@ -29,23 +29,25 @@ final class RoutineRepository: RoutineRepositoryProtocol {
     
     func fetchRoutine(routineId: String) async throws -> RoutineEntity? {
         let endpoint = RoutineEndpoint.fetchRoutine(routineId: routineId)
-        guard let response = try await networkService.request(endpoint: endpoint, type: RoutineResponseDTO.self) else { return nil }
+        guard let response = try await networkService.request(endpoint: endpoint, type: RoutineDTO.self) else { return nil }
         
         return response.toRoutineEntity()
     }
 
-    func fetchRoutines(from startDate: String, to endDate: String) async throws -> [String: [RoutineEntity]] {
+    func fetchRoutines(from startDate: String, to endDate: String) async throws -> [String: (routines: [RoutineEntity], allCompleted: Bool)] {
         let endpoint = RoutineEndpoint.fetchRoutines(startDate: startDate, endDate: endDate)
         guard let response = try await networkService.request(endpoint: endpoint, type: RoutineDictionaryDTO.self)
         else { return [:] }
 
-        var result: [String: [RoutineEntity]] = [:]
+        var result: [String: ([RoutineEntity], Bool)] = [:]
         for (date, routineDTO) in response.routines {
-            result[date] = routineDTO.compactMap({ $0.toRoutineEntity() })
+            let allCompleted = routineDTO.allCompleted
+            let routines = routineDTO.routineList.compactMap({ $0.toRoutineEntity() })
+            result[date] = (routines, allCompleted)
         }
         return result
     }
-
+    
     func updateRoutine(routine: RoutineCreationEntity) async throws {
         let routineUpdateDTO = RoutineCreationDTO(
             routineId: routine.id,
@@ -67,20 +69,8 @@ final class RoutineRepository: RoutineRepositoryProtocol {
         _ = try await networkService.request(endpoint: endpoint, type: EmptyResponseDTO.self)
     }
 
-    func deleteDailyRoutine(routine: DeleteRoutineEntity) async throws {
-        let deleteSubRoutineDTO = routine
-            .subRoutineInfosForDelete
-            .map({ DeleteSubRoutineDTO(subRoutineId: $0.subRoutineId, routineCompletionId: $0.routineCompletionId) })
-
-        let deleteRoutineDTO = DeleteRoutineDTO(
-            routineId: routine.routineId,
-            routineCompletionId: routine.routineCompletionId,
-            historySeq: routine.historySeq,
-            routineType: routine.routineType,
-            performedDate: routine.performedDate,
-            subRoutineInfosForDelete: deleteSubRoutineDTO)
-
-        let endpoint = RoutineEndpoint.deleteDailyRoutine(routine: deleteRoutineDTO)
+    func deleteDailyRoutine(routineId: String) async throws {
+        let endpoint = RoutineEndpoint.deleteDailyRoutine(routineId: routineId)
         _ = try await networkService.request(endpoint: endpoint, type: EmptyResponseDTO.self)
     }
 

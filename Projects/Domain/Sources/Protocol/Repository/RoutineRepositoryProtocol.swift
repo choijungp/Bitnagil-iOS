@@ -21,7 +21,7 @@ public protocol RoutineRepositoryProtocol {
     /// - Parameters:
     ///   - startDate: 조회 시작 날짜
     ///   - endDate: 조회 종료 날짜
-    func fetchRoutines(from startDate: String, to endDate: String) async throws -> [String: [RoutineEntity]]
+    func fetchRoutines(from startDate: String, to endDate: String) async throws -> [String: (routines: [RoutineEntity], allCompleted: Bool)]
 
     /// 루틴을 수정합니다.
     /// - Parameters:
@@ -34,7 +34,7 @@ public protocol RoutineRepositoryProtocol {
 
     /// 당일 루틴을 삭제합니다.
     /// - Parameter routine: 삭제할 루틴 정보
-    func deleteDailyRoutine(routine: DeleteRoutineEntity) async throws
+    func deleteDailyRoutine(routineId: String) async throws
 
     /// 루틴 완료 여부를 업데이트 합니다.
     /// - Parameter routines: 완료 여부를 업데이트할 루틴 배열

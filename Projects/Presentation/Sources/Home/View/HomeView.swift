@@ -86,7 +86,6 @@ final class HomeView: BaseViewController<HomeViewModel> {
     private let dimmedView = UIView()
     private let floatingButton = FloatingButton()
     private let floatingMenu = FloatingMenuView()
-    private var bottomSheet: CustomBottomSheet?
 
     private var contentViewTopConstraint: Constraint?
     private var cancellables: Set<AnyCancellable>
@@ -179,6 +178,10 @@ final class HomeView: BaseViewController<HomeViewModel> {
             BitnagilFont(style: .caption1, weight: .semiBold).attributedString(text: "더보기"),
             for: .normal)
         routineListButton.setTitleColor(BitnagilColor.gray10, for: .normal)
+        routineListButton.addAction(
+            UIAction { [weak self] _ in
+                self?.viewModel.action(input: .selectRoutineListDate)
+            }, for: .touchUpInside)
 
         routineScrollView.showsVerticalScrollIndicator = false
         routineScrollView.showsHorizontalScrollIndicator = false
@@ -430,10 +433,24 @@ final class HomeView: BaseViewController<HomeViewModel> {
                 }
             }
             .store(in: &cancellables)
+
+        viewModel.output.routineListDatePublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] selectedDate in
+                guard let self else { return }
+
+                guard let viewModel = DIContainer.shared.resolve(type: RoutineListViewModel.self)
+                else { return }
+
+                let routineListViewController = RoutineListViewController(viewModel: viewModel, selectedDate: selectedDate)
+                routineListViewController.hidesBottomBarWhenPushed = true
+                self.navigationController?.pushViewController(routineListViewController, animated: true)
+            }
+            .store(in: &cancellables)
     }
 
     // 해당 날짜의 Routine View를 설정합니다. (없다면 EmptyView)
-    private func updateRoutineView(routines: [MainRoutine]) {
+    private func updateRoutineView(routines: [Routine]) {
         routineStackView.arrangedSubviews.forEach {
             $0.removeFromSuperview()
         }
@@ -449,7 +466,6 @@ final class HomeView: BaseViewController<HomeViewModel> {
 
             for routine in routines {
                 let routineView = RoutineView(routine: routine)
-                routineView.delegate = self
                 routineStackView.addArrangedSubview(routineView)
             }
         }
@@ -557,19 +573,6 @@ final class HomeView: BaseViewController<HomeViewModel> {
         let emotionRegisterView = EmotionRegisterView(viewModel: emotionRegisterViewModel)
         emotionRegisterView.hidesBottomBarWhenPushed = true
         navigationController?.pushViewController(emotionRegisterView, animated: true)
-    }
-}
-
-// MARK: RoutineViewDelegate
-extension HomeView: RoutineViewDelegate {
-    func routineView(_ sender: RoutineView, didTapMainRoutineCheckButton mainRoutine: MainRoutine) {
-        showIndicatorView()
-        viewModel.action(input: .updateRoutineCompletion(updatedRoutine: mainRoutine))
-    }
-
-    func routineView(_ sender: RoutineView, didTapSubRoutineCheckButton subRoutine: SubRoutine) {
-        showIndicatorView()
-        viewModel.action(input: .updateRoutineCompletion(updatedRoutine: subRoutine))
     }
 }
 

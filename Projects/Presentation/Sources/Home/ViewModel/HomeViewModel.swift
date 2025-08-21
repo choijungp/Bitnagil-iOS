@@ -15,10 +15,9 @@ final class HomeViewModel: ViewModel {
         case loadEmotion
         case moveWeek(week: Int)
         case selectDate(date: Date)
+        case selectRoutineListDate
         case fetchRoutines
-        case selectRoutine(routine: MainRoutine?)
-        case deleteDailyRoutine
-        case deleteAllRoutine
+        case selectRoutine(routine: Routine?)
         case updateRoutineCompletion(updatedRoutine: Routine)
         case refreshSelectedDateRoutine
     }
@@ -27,21 +26,21 @@ final class HomeViewModel: ViewModel {
         let nicknamePublisher: AnyPublisher<String, Never>
         let emotionPublisher: AnyPublisher<Emotion?, Never>
         let selectedDatePublisher: AnyPublisher<Date, Never>
+        let routineListDatePublisher: AnyPublisher<Date, Never>
         let fetchRoutineResultPublisher: AnyPublisher<Bool, Never>
-        let routinesPublisher: AnyPublisher<[MainRoutine], Never>
-        let deleteRoutineResultPublisher: AnyPublisher<Bool, Never>
+        let routinesPublisher: AnyPublisher<[Routine], Never>
         let updateRoutineCompletionResultPublisher: AnyPublisher<Bool, Never>
     }
 
     private(set) var output: Output
-    private var routines: [String: [MainRoutine]] = [:]
+    private var routines: [String: [Routine]] = [:]
     private let nicknameSubject = CurrentValueSubject<String, Never>("")
     private let emotionSubject = CurrentValueSubject<Emotion?, Never>(nil)
     private let selectedDateSubject = CurrentValueSubject<Date, Never>(.now)
+    private let routineListDateSubject = PassthroughSubject<Date, Never>()
     private let fetchRoutineResultSubject = PassthroughSubject<Bool, Never>()
-    private let routinesSubject = CurrentValueSubject<[MainRoutine], Never>([])
-    private let selectedRoutineSubject = CurrentValueSubject<MainRoutine?, Never>(nil)
-    private let deleteRoutineResultSubject = PassthroughSubject<Bool, Never>()
+    private let routinesSubject = CurrentValueSubject<[Routine], Never>([])
+    private let selectedRoutineSubject = CurrentValueSubject<Routine?, Never>(nil)
     private let updateRoutineCompletionResultSubject = PassthroughSubject<Bool, Never>()
 
     private let calendar = Calendar.current
@@ -64,9 +63,9 @@ final class HomeViewModel: ViewModel {
             nicknamePublisher: nicknameSubject.eraseToAnyPublisher(),
             emotionPublisher: emotionSubject.eraseToAnyPublisher(),
             selectedDatePublisher: selectedDateSubject.eraseToAnyPublisher(),
+            routineListDatePublisher: routineListDateSubject.eraseToAnyPublisher(),
             fetchRoutineResultPublisher: fetchRoutineResultSubject.eraseToAnyPublisher(),
             routinesPublisher: routinesSubject.eraseToAnyPublisher(),
-            deleteRoutineResultPublisher: deleteRoutineResultSubject.eraseToAnyPublisher(),
             updateRoutineCompletionResultPublisher: updateRoutineCompletionResultSubject.eraseToAnyPublisher()
         )
     }
@@ -85,17 +84,15 @@ final class HomeViewModel: ViewModel {
         case .selectDate(let date):
             selectDate(date: date)
 
+        case .selectRoutineListDate:
+            let selectedDate = selectedDateSubject.value
+            routineListDateSubject.send(selectedDate)
+
         case .fetchRoutines:
             fetchRoutines()
 
         case .selectRoutine(let routine):
             selectedRoutineSubject.send(routine)
-
-        case .deleteDailyRoutine:
-            deleteDailyRoutine()
-
-        case .deleteAllRoutine:
-            deleteAllRoutine()
 
         case .updateRoutineCompletion(let updatedRoutine):
             updateRoutineCompletion(updatedRoutine: updatedRoutine)
@@ -190,8 +187,9 @@ final class HomeViewModel: ViewModel {
         Task {
             do {
                 let entities = try await routineUseCase.fetchRoutines(startDate: startDate, endDate: endDate)
-                for (date, routineEntities) in entities {
-                    routines[date] = routineEntities.compactMap({ $0.toMainRoutine() })
+                for (date, values) in entities {
+                    let routineEntities = values.routines
+                    routines[date] = routineEntities.compactMap({ $0.toRoutine() })
                 }
                 fetchRoutineResultSubject.send(true)
             } catch {
@@ -200,51 +198,9 @@ final class HomeViewModel: ViewModel {
         }
     }
 
-    // 반복 루틴을 삭제합니다.
-    private func deleteAllRoutine() {
-        guard let routineId = selectedRoutineSubject.value?.id
-        else { return }
-
-        Task {
-            do {
-                try await routineUseCase.deleteAllRoutine(routineId: routineId)
-                selectedRoutineSubject.send(nil)
-                deleteRoutineResultSubject.send(true)
-                fetchRoutines()
-            } catch {
-                deleteRoutineResultSubject.send(false)
-            }
-        }
-    }
-
-    // 당일 루틴을 삭제합니다.
-    private func deleteDailyRoutine() {
-        guard let routine = selectedRoutineSubject.value
-        else { return }
-
-        let deleteSubRoutineEntity = routine.subRoutines.map({
-            DeleteSubRoutineEntity(subRoutineId: $0.id, routineCompletionId: $0.completionId) })
-        let deleteRoutinEntity = DeleteRoutineEntity(
-            routineId: routine.id,
-            routineCompletionId: routine.completionId,
-            historySeq: routine.historySeq,
-            performedDate: selectedDateSubject.value.convertToString(dateType: .yearMonthDate),
-            routineType: routine.routineType,
-            subRoutineInfosForDelete: deleteSubRoutineEntity)
-
-        Task {
-            do {
-                try await routineUseCase.deleteDailyRoutine(routine: deleteRoutinEntity)
-                deleteRoutineResultSubject.send(true)
-                fetchRoutines()
-            } catch {
-                deleteRoutineResultSubject.send(false)
-            }
-        }
-    }
-
     // 루틴의 완료 여부를 업데이트 합니다.
     private func updateRoutineCompletion(updatedRoutine: Routine) {
+        /*
         let performedDate = selectedDateSubject.value.convertToString(dateType: .yearMonthDate)
         var routineCompletionEntities: [RoutineCompletionEntity] = []
 
@@ -303,5 +259,6 @@ final class HomeViewModel: ViewModel {
                 updateRoutineCompletionResultSubject.send(false)
             }
         }
+         */
     }
 }
