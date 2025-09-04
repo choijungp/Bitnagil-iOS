@@ -7,13 +7,13 @@
 
 import Combine
 import Domain
+import Foundation
 import Shared
 
 final class ResultRecommendedRoutineViewModel: ViewModel {
-
     enum ResultRecommendedRoutineViewModelType {
-        case onboarding(onboardingChoices: [OnboardingChoiceType])
-        case mypage(onboardingChoices: [OnboardingChoiceType])
+        case onboarding(onboardingEntity: OnboardingEntity)
+        case mypage(onboardingEntity: OnboardingEntity)
         case emotion(emotion: Emotion)
     }
     
@@ -22,6 +22,7 @@ final class ResultRecommendedRoutineViewModel: ViewModel {
         case fetchSelectedRoutineId
         case selectRecommendedRoutine(routine: RecommendedRoutine)
         case registerRecommendedRoutine
+        case showRecommendedRoutineToastMessageView
     }
 
     struct Output {
@@ -66,6 +67,9 @@ final class ResultRecommendedRoutineViewModel: ViewModel {
 
         case .registerRecommendedRoutine:
             registerRecommendedRoutine()
+
+        case .showRecommendedRoutineToastMessageView:
+            showRecommendedRoutineToastMessageView()
         }
     }
 
@@ -79,12 +83,15 @@ final class ResultRecommendedRoutineViewModel: ViewModel {
         Task {
             do {
                 switch viewModelType {
-                case .onboarding(let onboardingChoices):
-                    try await fetchResultRecommendedRoutines(onboardingChoices: onboardingChoices)
-                case .mypage(let onboardingChoices):
-                    try await fetchResultRecommendedRoutines(onboardingChoices: onboardingChoices)
+                case .onboarding(let onboardingEntity):
+                    try await fetchResultRecommendedRoutines(onboardingEntity: onboardingEntity)
+
+                case .mypage(let onboardingEntity):
+                    try await fetchResultRecommendedRoutines(onboardingEntity: onboardingEntity)
+
                 case .emotion(let emotion):
                     try await fetchResultRecommendedRoutines(emotion: emotion)
+
                 case nil:
                     fatalError("ResultRecommendedRoutineViewModel Type이 설정되지 않았습니다.")
                 }
@@ -96,8 +103,8 @@ final class ResultRecommendedRoutineViewModel: ViewModel {
     }
 
     // 온보딩 · 목표 선택지를 등록하고 그에 따른 추천 루틴 결과를 불러옵니다.
-    private func fetchResultRecommendedRoutines(onboardingChoices: [OnboardingChoiceType]) async throws {
-        let entities = try await resultRecommendedRoutineUseCase.fetchResultRecommendedRoutines(onboardingChoices: onboardingChoices)
+    private func fetchResultRecommendedRoutines(onboardingEntity: OnboardingEntity) async throws {
+        let entities = try await resultRecommendedRoutineUseCase.fetchResultRecommendedRoutines(onboardingEntity: onboardingEntity)
         let recommendedRoutines = entities.map({ $0.toRecommendedRoutine() })
         resultRecommendedRoutinesSubject.send([])
         resultRecommendedRoutinesSubject.send(recommendedRoutines)
@@ -148,6 +155,15 @@ final class ResultRecommendedRoutineViewModel: ViewModel {
                 BitnagilLogger.log(logType: .error, message: "\(error.localizedDescription)")
                 registerRoutineResultSubject.send(false)
             }
+        }
+    }
+
+    private func showRecommendedRoutineToastMessageView() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NotificationCenter.default.post(
+                name: .showRecommendedRoutineToast,
+                object: nil,
+                userInfo: nil)
         }
     }
 }
