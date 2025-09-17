@@ -39,4 +39,21 @@ enum BitnagilGraphic {
     static let tutorialHomeMoreGraphic = UIImage(named: "tutorial_home_more_graphic", in: bundle, with: nil)
     static let tutorialRecommendationRoutineGraphic = UIImage(named: "tutorial_recommendation_routine_graphic", in: bundle, with: nil)
     static let tutorialEditRoutineGraphic = UIImage(named: "tutorial_edit_routine_graphic", in: bundle, with: nil)
+    // MARK: - Emotion
+    static let marbleSpeechGraphic = UIImage(named: "marble_speech_graphic", in: bundle, with: nil)
+    static let fomoHandGraphic = UIImage(named: "fomo_hand_graphic", in: bundle, with: nil)
+    static let fomoThumbGraphic = UIImage(named: "fomo_thumb_graphic", in: bundle, with: nil)
+    static let marbleRedGraphic = UIImage(named: "marble_red_graphic", in: bundle, with: nil)
+    static let marbleNoneGraphic = UIImage(named: "marble_none_graphic", in: bundle, with: nil)
+    static let marbleOrangeGraphic = UIImage(named: "marble_orange_graphic", in: bundle, with: nil)
+    static let marbleMintGraphic = UIImage(named: "marble_mint_graphic", in: bundle, with: nil)
+    static let marbleGreenGraphic = UIImage(named: "marble_green_graphic", in: bundle, with: nil)
+    static let marbleGrayGraphic = UIImage(named: "marble_gray_graphic", in: bundle, with: nil)
+    static let marblePurpleGraphic = UIImage(named: "marble_purple_graphic", in: bundle, with: nil)
+    // MARK: - Emotion Register Completion
+    static let emotionCompletionBackgroundGraphic = UIImage(named: "emotion_background_graphic", in: bundle, with: nil)
+    static let emotionCompletionGroundGraphic = UIImage(named: "emotion_ground_graphic", in: bundle, with: nil)
+    static let pomoLeftHandGraphic = UIImage(named: "marble_pomo_left_hand_graphic", in: bundle, with: nil)
+    static let pomoRightHandGraphic = UIImage(named: "marble_pomo_right_hand_graphic", in: bundle, with: nil)
+    static let marblePomoGraphic = UIImage(named: "marblePomo_graphic", in: bundle, with: nil)
 }
