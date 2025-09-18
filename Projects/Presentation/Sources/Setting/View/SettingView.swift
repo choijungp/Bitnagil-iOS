@@ -225,6 +225,15 @@ final class SettingView: BaseViewController<SettingViewModel> {
             })
             .store(in: &cancellables)
     }
+
+    private func goToWithdrawView() {
+        guard let withdrawViewModel = DIContainer.shared.resolve(type: WithdrawViewModel.self)
+        else { fatalError("") }
+
+        let withdrawViewController = WithdrawViewController(viewModel: withdrawViewModel)
+        withdrawViewController.hidesBottomBarWhenPushed = true
+        navigationController?.pushViewController(withdrawViewController, animated: true)
+    }
 }
 
 extension SettingView: UITableViewDelegate {
@@ -250,29 +259,19 @@ extension SettingView: UITableViewDelegate {
             switch row {
             case .logout:
                 alert = BitnagilAlert(
-                    alertType: .withImage,
-                    title: "로그아웃 하시겠어요?",
-                    content: "버튼을 누르면 로그인 페이지로 이동해요.",
+                    title: "로그아웃할까요?",
+                    content: "이 기기에서 계정이 로그아웃되고, 다시\n로그인해야 서비스를 계속 이용할 수 있어요.",
                     cancelButtonTitle: "취소",
                     confirmButtonTitle: "로그아웃",
                     cancelHandler: nil,
                     confirmHandler: { [weak self] in
                         self?.viewModel.action(input: .logout)
                     })
+                alert.modalPresentationStyle = .overFullScreen
+                present(alert, animated: false)
             case .withdrawal:
-                alert = BitnagilAlert(
-                    alertType: .withImage,
-                    title: "정말 탈퇴하시겠어요?",
-                    content: "소중한 기록들이 모두 사라져요.",
-                    cancelButtonTitle: "취소",
-                    confirmButtonTitle: "회원탈퇴",
-                    cancelHandler: nil,
-                    confirmHandler: { [weak self] in
-                        self?.viewModel.action(input: .withdrawal)
-                    })
+                goToWithdrawView()
             }
-            alert.modalPresentationStyle = .overFullScreen
-            present(alert, animated: false)
         }
         tableView.deselectRow(at: indexPath, animated: true)
     }
