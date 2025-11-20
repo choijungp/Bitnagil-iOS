@@ -14,7 +14,7 @@ final class MypageView: BaseViewController<MypageViewModel> {
     private enum Layout {
         static let profileImageViewSize: CGFloat = 80
         static let profileImageViewCornerRadius: CGFloat = profileImageViewSize / 2
-        static let profileImageViewTopSpacing: CGFloat = 32
+        static let profileImageViewTopSpacing: CGFloat = 74
         static let nicknameLabelHeight: CGFloat = 24
         static let nicknameLabelTopSpacing: CGFloat = 12
         static let divideLineHeight: CGFloat = 6
@@ -41,28 +41,12 @@ final class MypageView: BaseViewController<MypageViewModel> {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-
-        navigationController?.setNavigationBarHidden(false, animated: animated)
-
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = .white
-        appearance.shadowColor = .clear
-
-        navigationController?.navigationBar.standardAppearance = appearance
-        navigationController?.navigationBar.scrollEdgeAppearance = appearance
-        navigationController?.navigationBar.compactAppearance = appearance
-        navigationController?.navigationBar.isHidden = false
+        navigationController?.navigationBar.isHidden = true
     }
 
     override func configureAttribute() {
         view.backgroundColor = .white
-        navigationItem.rightBarButtonItem = settingButton
-        title = "마이페이지"
 
-        settingButton.action = #selector(settingButtonTapped)
-        settingButton.target = self
-        settingButton.image = BitnagilIcon.settingIcon?.withRenderingMode(.alwaysOriginal)
         profileImageView.image = BitnagilGraphic.profileGraphic
 
         nicknameLabel.font = BitnagilFont(style: .title3, weight: .semiBold).font
@@ -76,6 +60,21 @@ final class MypageView: BaseViewController<MypageViewModel> {
         tableView.delegate = self
         tableView.separatorStyle = .none
         tableView.bounces = false
+
+        let settingButtonImage = BitnagilIcon.settingIcon
+        let settingButtonAction = UIAction { [weak self] _ in
+            guard let settingViewModel = Shared.DIContainer.shared.resolve(type: SettingViewModel.self) else { return }
+            let settingView = SettingView(viewModel: settingViewModel)
+            self?.navigationController?.pushViewController(settingView, animated: true)
+        }
+
+        configureCustomNavigationBar(navigationBarStyle:
+                .withRightButton(
+                        title: "마이페이지",
+                        rightButtonImage: settingButtonImage ?? .init(),
+                        rightButtonAction: settingButtonAction,
+                        rightButtonTintColor: BitnagilColor.gray70,
+                        withBackButton: false))
     }
 
     override func configureLayout() {
@@ -126,12 +125,6 @@ final class MypageView: BaseViewController<MypageViewModel> {
             }
             .store(in: &cancellables)
     }
-
-    @objc private func settingButtonTapped() {
-        guard let settingViewModel = Shared.DIContainer.shared.resolve(type: SettingViewModel.self) else { return }
-        let settingView = SettingView(viewModel: settingViewModel)
-        navigationController?.pushViewController(settingView, animated: true)
-    }
 }
 
 extension MypageView: UITableViewDelegate {
@@ -165,16 +158,24 @@ extension MypageView: UITableViewDataSource {
 
         let selectedMenu = MypageViewModel.MypageMenu.allCases[indexPath.row]
 
-        guard selectedMenu == .resetGoal else {
+        switch selectedMenu {
+
+        case .reportHistory:
+            guard let reportHistoryViewModel = DIContainer.shared.resolve(type: ReportHistoryViewModel.self)
+            else { fatalError("reportHistoryViewModel 의존성이 등록되지 않았습니다.") }
+
+            let reportHistoryViewController = ReportHistoryViewController(viewModel: reportHistoryViewModel)
+            reportHistoryViewController.hidesBottomBarWhenPushed = true
+            navigationController?.pushViewController(reportHistoryViewController, animated: true)
+        case .resetGoal:
+            guard let onboardingViewModel = DIContainer.shared.resolve(type: OnboardingViewModel.self)
+            else { fatalError("onboardingViewModel 의존성이 등록되지 않았습니다.") }
+
+            let onboardingView = OnboardingResultViewController(viewModel: onboardingViewModel, entryPoint: .myPagePrevious)
+            onboardingView.hidesBottomBarWhenPushed = true
+            navigationController?.pushViewController(onboardingView, animated: true)
+        case .notice, .faq:
             viewModel.action(input: .didSelectMenu(menu: selectedMenu))
-            return
         }
-
-        guard let onboardingViewModel = DIContainer.shared.resolve(type: OnboardingViewModel.self)
-        else { fatalError("onboardingViewModel 의존성이 등록되지 않았습니다.") }
-
-        let onboardingView = OnboardingResultViewController(viewModel: onboardingViewModel, entryPoint: .myPagePrevious)
-        onboardingView.hidesBottomBarWhenPushed = true
-        navigationController?.pushViewController(onboardingView, animated: true)
     }
 }
