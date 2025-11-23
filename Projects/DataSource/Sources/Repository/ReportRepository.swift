@@ -6,12 +6,36 @@
 //
 
 import Domain
+import Foundation
 
 final class ReportRepository: ReportRepositoryProtocol {
     private let networkService = NetworkService.shared
 
-    func report(reportEntity: ReportEntity) async {
+    func report(
+        title: String,
+        content: String?,
+        category: ReportType,
+        location: LocationEntity?,
+        photoURLs: [String]
+    ) async throws -> Int? {
+        let reportDTO = ReportDTO(
+            reportId: nil,
+            reportDate: nil,
+            reportTitle: title,
+            reportContent: content,
+            reportLocation: location?.address ?? "",
+            reportStatus: nil,
+            reportCategory: category.description,
+            reportImageUrl: nil,
+            reportImageUrls: photoURLs,
+            latitude: location?.latitude,
+            longitude: location?.longitude
+        )
 
+        let endpoint = ReportEndpoint.register(report: reportDTO)
+        guard let id = try await networkService.request(endpoint: endpoint, type: Int.self) else { return nil }
+
+        return id
     }
 
     func fetchReports() async throws -> [ReportEntity] {

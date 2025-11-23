@@ -30,11 +30,6 @@ final class ReportLoadingViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            let reportCompleteViewController = ReportCompleteViewController()
-            self?.navigationController?.pushViewController(reportCompleteViewController, animated: true)
-        }
     }
 
     private func configureAttribute() {
@@ -80,6 +75,18 @@ final class ReportLoadingViewController: UIViewController {
         fomoImageView.snp.makeConstraints { make in
             make.top.equalTo(subLabel.snp.bottom).offset(Layout.fomoImageViewTopSpacing)
             make.centerX.equalTo(safeArea)
+        }
+    }
+}
+
+extension ReportLoadingViewController: ReportRegistrationViewControllerDelegate {
+    func reportRegistrationViewController(_ sender: ReportRegistrationViewController, completeRegistration reportId: Int?) {
+        if let reportId {
+            let reportCompleteViewController = ReportCompleteViewController()
+            // TODO: - reportCompleteViewController에 제보id 전달 (또는 생성한 제보 객체 자체를 넘기기. 논의 필요)
+            self.navigationController?.pushViewController(reportCompleteViewController, animated: true)
+        } else {
+            navigationController?.popViewController(animated: true)
         }
     }
 }

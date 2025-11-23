@@ -7,6 +7,7 @@
 
 import Combine
 import Domain
+import Foundation
 
 final class ReportDetailViewModel: ViewModel {
     enum Input {
@@ -39,17 +40,19 @@ final class ReportDetailViewModel: ViewModel {
         Task {
             do {
                 if let reportEntity = try await reportRepository.fetchReportDetail(reportId: reportId) {
+                    let date = Date.convertToDate(from: reportEntity.date ?? "", dateType: .yearMonthDate)
+                    let dateString = date?.convertToString(dateType: .yearMonthDateWeek2)
+
                     let reportDetail = ReportDetail(
-                        date: reportEntity.date ?? "",
+                        date: dateString ?? "",
                         title: reportEntity.title,
                         status: reportEntity.progress,
                         category: reportEntity.type,
                         description: reportEntity.content ?? "",
                         location: reportEntity.location.address ?? "",
-                        photoUrls: reportEntity.photoUrls)
+                        photoUrls: reportEntity.photoURLs)
                     reportDetailSubject.send(reportDetail)
                 }
-                reportDetailSubject.send(nil)
             } catch {
                 reportDetailSubject.send(nil)
             }

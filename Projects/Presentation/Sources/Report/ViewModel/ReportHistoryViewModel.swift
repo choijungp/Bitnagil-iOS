@@ -18,7 +18,6 @@ final class ReportHistoryViewModel: ViewModel {
 
     struct Output {
         let progressPublisher: AnyPublisher<[ReportProgressItem], Never>
-        let selectedProgressPublisher: AnyPublisher<ReportProgress?, Never>
         let categoryPublisher: AnyPublisher<[ReportType], Never>
         let selectedCategoryPublisher: AnyPublisher<ReportType?, Never>
         let reportsPublisher: AnyPublisher<[ReportHistoryItem], Never>
@@ -27,12 +26,12 @@ final class ReportHistoryViewModel: ViewModel {
 
     private(set) var output: Output
     private let progressSubject = CurrentValueSubject<[ReportProgressItem], Never>([])
-    private let selectedProgressSubject = CurrentValueSubject<ReportProgress?, Never>(nil)
     private let categorySubject = CurrentValueSubject<[ReportType], Never>([])
     private let selectedCategorySubject = CurrentValueSubject<ReportType?, Never>(nil)
     private let reportSubject = CurrentValueSubject<[ReportHistoryItem], Never>([])
     private let selectedReportSubject = PassthroughSubject<Int?, Never>()
     private(set) var selectedReportCategory: ReportType?
+    private var selectedProgress: ReportProgress?
     private var reports: [ReportHistoryItem] = []
     private let reportRepository: ReportRepositoryProtocol
 
@@ -49,7 +48,6 @@ final class ReportHistoryViewModel: ViewModel {
 
         output = Output(
             progressPublisher: progressSubject.eraseToAnyPublisher(),
-            selectedProgressPublisher: selectedProgressSubject.eraseToAnyPublisher(),
             categoryPublisher: categorySubject.eraseToAnyPublisher(),
             selectedCategoryPublisher: selectedCategorySubject.eraseToAnyPublisher(),
             reportsPublisher: reportSubject.eraseToAnyPublisher(),
@@ -89,25 +87,29 @@ final class ReportHistoryViewModel: ViewModel {
 
         for i in 0..<progressItems.count {
             if progressItems[i].progress == progress {
-                progressItems[i].isSelected.toggle()
+                progressItems[i].isSelected = true
             } else {
                 progressItems[i].isSelected = false
             }
         }
 
+        selectedProgress = progress
         progressSubject.send(progressItems)
 
         filterReports()
     }
 
     private func filterReports() {
-        let selectedProgress = selectedProgressSubject.value
         let selectedCategory = selectedCategorySubject.value
 
         var filteredReports = reports
-        if let selectedProgress {
+        if
+            let selectedProgress,
+            selectedProgress != .entire
+        {
             filteredReports = filteredReports.filter({ $0.progress == selectedProgress })
         }
+        
         if let selectedCategory {
             filteredReports = filteredReports.filter({ $0.type == selectedCategory })
         }
@@ -121,11 +123,16 @@ final class ReportHistoryViewModel: ViewModel {
 
                 var reportHistoryItems: [ReportHistoryItem] = []
                 for reportEntity in reportEntities {
+                    let date = Date.convertToDate(from: reportEntity.date ?? "", dateType: .yearMonthDate)
+                    let dateString = date?.convertToString(dateType: .yearMonthDateWeek)
+
+                    guard let id = reportEntity.id else { continue }
+
                     let reportHistoryItem = ReportHistoryItem(
-                        id: reportEntity.id,
+                        id: id,
                         title: reportEntity.title,
-                        thumbnailUrl: reportEntity.photoUrls.first ?? "",
-                        date: reportEntity.date ?? "",
+                        thumbnailUrl: reportEntity.thumbnailURL ?? "",
+                        date: dateString ?? "",
                         type: reportEntity.type,
                         progress: reportEntity.progress,
                         location: reportEntity.location.address ?? "")
@@ -134,6 +141,25 @@ final class ReportHistoryViewModel: ViewModel {
 
                 reports = reportHistoryItems
                 reportSubject.send(reportHistoryItems)
+
+                let progressItems: [ReportProgressItem] = ReportProgress.allCases.map { progress in
+                    let count: Int
+
+                    switch progress {
+                    case .entire:
+                        count = reports.count
+                    default:
+                        count = reports.filter { $0.progress == progress }.count
+                    }
+
+                    return ReportProgressItem(
+                        uuid: UUID(),
+                        progress: progress,
+                        count: count,
+                        isSelected: progress == .entire)
+                }
+
+                progressSubject.send(progressItems)
             } catch {
                 // TODO: 에러 처리
             }
