@@ -5,10 +5,12 @@
 //  Created by 최정인 on 11/19/25.
 //
 
+import Combine
+import Shared
 import SnapKit
 import UIKit
 
-final class ReportCompleteViewController: UIViewController {
+final class ReportCompleteViewController: BaseViewController<ReportDetailViewModel> {
     private enum Layout {
         static let horizontalMargin: CGFloat = 20
         static let completeImageViewTopSpacing: CGFloat = 78
@@ -65,15 +67,27 @@ final class ReportCompleteViewController: UIViewController {
     private let descriptionLabel = UILabel()
     private let photoStackView = UIStackView()
     private let confirmButton = PrimaryButton(buttonState: .default, buttonTitle: "확인")
+    private let reportId: Int
+    private var cancellables: Set<AnyCancellable> = []
+
+    init(viewModel: ReportDetailViewModel, reportId: Int) {
+        self.reportId = reportId
+
+        super.init(viewModel: viewModel)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
         configureAttribute()
         configureLayout()
-        fetchReport()
+        viewModel.action(input: .fetchReportDetail(reportId: reportId))
     }
 
-    private func configureAttribute() {
+    override func configureAttribute() {
         view.backgroundColor = .white
         scrollView.showsVerticalScrollIndicator = false
 
@@ -106,12 +120,28 @@ final class ReportCompleteViewController: UIViewController {
 
         confirmButton.addAction(
             UIAction { [weak self] _ in
-                self?.navigationController?.popToRootViewController(animated: true)
+                if
+                    let self,
+                    let tabBarController = self.tabBarController,
+                    let homeViewController = tabBarController.viewControllers?[0] as? UINavigationController,
+                    let recommendedRoutineViewController = tabBarController.viewControllers?[1] as? UINavigationController,
+                    let mypageViewController = tabBarController.viewControllers?[2] as? UINavigationController,
+                    let reportHistoryViewModel = DIContainer.shared.resolve(type: ReportHistoryViewModel.self) {
+
+                    homeViewController.popToRootViewController(animated: false)
+                    recommendedRoutineViewController.popToRootViewController(animated: false)
+
+                    tabBarController.selectedIndex = 2
+                    let reportHistoryViewController = ReportHistoryViewController(viewModel: reportHistoryViewModel)
+                    mypageViewController.pushViewController(reportHistoryViewController, animated: true)
+                } else {
+                    self?.navigationController?.popToRootViewController(animated: true)
+                }
             },
             for: .touchUpInside)
     }
 
-    private func configureLayout() {
+    override func configureLayout() {
         let safeArea = view.safeAreaLayoutGuide
 
         view.addSubview(scrollView)
@@ -123,10 +153,6 @@ final class ReportCompleteViewController: UIViewController {
 
         backgroudView.addSubview(summaryStackView)
         summaryStackView.addArrangedSubview(summaryLabel)
-        ReportCompleteContent.allCases.forEach { reportCompleteContentType in
-            let contentStackView = makeContentView(contentType: reportCompleteContentType)
-            summaryStackView.addArrangedSubview(contentStackView)
-        }
 
         scrollView.snp.makeConstraints { make in
             make.edges.equalTo(safeArea)
@@ -177,8 +203,37 @@ final class ReportCompleteViewController: UIViewController {
         }
     }
 
-    private func bind() {
-        fetchReport()
+    override func bind() {
+        viewModel.output.reportDetailPublisher
+            .receive(on: DispatchQueue.main)
+            .sink(receiveValue: { [weak self] reportDetail in
+                guard let reportDetail else { return }
+
+                self?.titleLabel.text = reportDetail.title
+                self?.categoryLabel.text = reportDetail.category.name
+                self?.locationLabel.text = reportDetail.location
+                let descriptionText = reportDetail.description
+                self?.descriptionLabel.numberOfLines = 0
+                self?.descriptionLabel.attributedText = BitnagilFont(style: .body1, weight: .medium)
+                    .attributedString(text: descriptionText, alignment: .right)
+
+                ReportCompleteContent.allCases.forEach { reportCompleteContentType in
+                    let contentStackView = self?.makeContentView(contentType: reportCompleteContentType)
+                    self?.summaryStackView.addArrangedSubview(contentStackView ?? UIView())
+                }
+
+                self?.photoStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+                for photoURL in reportDetail.photoUrls {
+                    guard
+                        let photoView = self?.makePhotoView(),
+                        let url = URL(string: photoURL)
+                    else { continue }
+
+                    photoView.kf.setImage(with: url)
+                    self?.photoStackView.addArrangedSubview(photoView)
+                }
+            })
+            .store(in: &cancellables)
     }
 
     private func makeContentView(contentType: ReportCompleteContent) -> UIView {
@@ -200,7 +255,6 @@ final class ReportCompleteViewController: UIViewController {
             contentView = photoStackView
         } else {
             var contentLabel = UILabel()
-            contentLabel.text = " "
             switch contentType {
             case .title:
                 contentLabel = titleLabel
@@ -229,25 +283,8 @@ final class ReportCompleteViewController: UIViewController {
         return contentContainerView
     }
 
-    // TODO: 추후 ViewModel로 옮기기
-    private func fetchReport() {
-        titleLabel.text = "가로등이 깜박거려요."
-        categoryLabel.text = "교통시설"
-        locationLabel.text = "서울특별시 강남구 삼성동"
-        let descriptionText = "150자 내용 채우기"
-        descriptionLabel.attributedText = BitnagilFont(style: .body1, weight: .medium)
-            .attributedString(text: descriptionText, alignment: .right)
-
-        let photoView1 = makePhotoView()
-        let photoView2 = makePhotoView()
-        let photoView3 = makePhotoView()
-        [photoView1, photoView2, photoView3].forEach {
-            photoStackView.addArrangedSubview($0)
-        }
-    }
-
-    private func makePhotoView() -> UIView {
-        let photoView = UIView()
+    private func makePhotoView() -> UIImageView {
+        let photoView = UIImageView()
         photoView.backgroundColor = BitnagilColor.gray30
         photoView.layer.masksToBounds = true
         photoView.layer.cornerRadius = 6
