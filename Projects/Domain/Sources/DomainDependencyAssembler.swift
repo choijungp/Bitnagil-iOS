@@ -28,10 +28,6 @@ public struct DomainDependencyAssembler: DependencyAssemblerProtocol {
             return LogoutUseCase(authRepository: authRepository)
         }
 
-        DIContainer.shared.register(type: WithdrawUseCaseProtocol.self) { _ in
-            return WithdrawUseCase(authRepository: authRepository)
-        }
-
         DIContainer.shared.register(type: RecommendedRoutineUseCaseProtocol.self) { container in
             guard let recommendedRoutineRepository = container.resolve(type: RecommendedRoutineRepositoryProtocol.self)
             else { fatalError("recommendedRoutineRepository 의존성이 등록되지 않았습니다.") }
@@ -65,6 +61,19 @@ public struct DomainDependencyAssembler: DependencyAssemblerProtocol {
             else { fatalError("routineRepository 의존성이 등록되지 않았습니다.") }
 
             return RoutineUseCase(routineRepository: routineRepository)
+        }
+
+        DIContainer.shared.register(type: ReportUseCaseProtocol.self) { container in
+            guard
+                let locationRepository = container.resolve(type: LocationRepositoryProtocol.self),
+                let reportRepository = container.resolve(type: ReportRepositoryProtocol.self),
+                let fileRepository = container.resolve(type: FileRepositoryProtocol.self)
+            else { fatalError("reportUseCase에 필요한 의존성이 등록되지 않았습니다.") }
+
+            return ReportUseCase(
+                locationRepository: locationRepository,
+                reportRepository: reportRepository,
+                fileRepository: fileRepository)
         }
     }
 }

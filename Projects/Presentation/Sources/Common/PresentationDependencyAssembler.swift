@@ -50,7 +50,10 @@ public struct PresentationDependencyAssembler: DependencyAssemblerProtocol {
             guard let userDataRepository = container.resolve(type: UserDataRepositoryProtocol.self)
             else { fatalError("userDataRepository 의존성이 등록되지 않았습니다.") }
 
-            return OnboardingViewModel(userDataRepository: userDataRepository)
+            guard let onboardingRepository = container.resolve(type: OnboardingRepositoryProtocol.self)
+            else { fatalError("userDataRepository 의존성이 등록되지 않았습니다.") }
+
+            return OnboardingViewModel(userDataRepository: userDataRepository, onboardingRepository: onboardingRepository)
         }
 
         DIContainer.shared.register(type: RecommendedRoutineViewModel.self) { container in
@@ -109,6 +112,34 @@ public struct PresentationDependencyAssembler: DependencyAssemblerProtocol {
             else { fatalError("routineRepository 의존성이 등록되지 않았습니다.") }
 
             return RoutineListViewModel(routineRepository: routineRepository)
+        }
+
+        DIContainer.shared.register(type: WithdrawViewModel.self) { container in
+            guard let authRepository = container.resolve(type: AuthRepositoryProtocol.self)
+            else { fatalError("authRepository 의존성이 등록되지 않았습니다.") }
+
+            return WithdrawViewModel(authRepository: authRepository)
+        }
+
+        DIContainer.shared.register(type: ReportRegistrationViewModel.self) { container in
+            guard let reportUseCase = container.resolve(type: ReportUseCaseProtocol.self)
+            else { fatalError("reportUseCase 의존성이 등록되지 않았습니다.") }
+
+            return ReportRegistrationViewModel(reportUseCase: reportUseCase)
+        }
+
+        DIContainer.shared.register(type: ReportHistoryViewModel.self) { container in
+            guard let reportRepository = container.resolve(type: ReportRepositoryProtocol.self)
+            else { fatalError("reportRepository 의존성이 등록되지 않았습니다.") }
+
+            return ReportHistoryViewModel(reportRepository: reportRepository)
+        }
+
+        DIContainer.shared.register(type: ReportDetailViewModel.self) { container in
+            guard let reportRepository = container.resolve(type: ReportRepositoryProtocol.self)
+            else { fatalError("reportRepository 의존성이 등록되지 않았습니다.") }
+
+            return ReportDetailViewModel(reportRepository: reportRepository)
         }
     }
 }

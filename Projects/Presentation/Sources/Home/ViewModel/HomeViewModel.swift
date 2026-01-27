@@ -35,7 +35,7 @@ final class HomeViewModel: ViewModel {
         let updateVersionPublisher: AnyPublisher<URL?, Never>
     }
 
-    private(set) var output: Output
+    let output: Output
     private var routines: [String: [Routine]] = [:]
     private var routinesCompleted: [String: Bool] = [:]
     private let nicknameSubject = CurrentValueSubject<String, Never>("")
@@ -276,14 +276,14 @@ final class HomeViewModel: ViewModel {
 
     private func checkVersion() {
         let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-        let major = currentVersion?.split(separator: ".").first
+        let majorVersion = Int(currentVersion?.components(separatedBy: ".").first ?? "0") ?? 0
 
         Task {
             do {
                 let appStoreAppVersion = try await appConfigRepository.fetchAppVersion()
-                let appStoreMajor = appStoreAppVersion?.split(separator: ".").first
+                let appStoreMajor = Int(appStoreAppVersion?.components(separatedBy: ".").first ?? "0") ?? 0
 
-                if major != appStoreMajor {
+                if majorVersion < appStoreMajor {
                     let url = URL(string: "itms-apps://itunes.apple.com/app/id6749437799")
                     updateVersionSubject.send(url)
                 } else {

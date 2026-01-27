@@ -45,7 +45,7 @@ final class HomeViewController: BaseViewController<HomeViewModel> {
         static let floatingButtonBottomSpacing: CGFloat = 19
         static let floatingButtonSize: CGFloat = 52
         static let floatingMenuBottomSpacing: CGFloat = 16
-        static let floatingMenuHeight: CGFloat = 56
+        static let floatingMenuHeight: CGFloat = 104
         static let floatingMenuWidth: CGFloat = 144
     }
 
@@ -117,6 +117,14 @@ final class HomeViewController: BaseViewController<HomeViewModel> {
         logoImageView.image = BitnagilGraphic.grayLogoGraphic
         helpButton.setImage(BitnagilIcon.helpIcon, for: .normal)
         alarmButton.setImage(BitnagilIcon.alarmIcon, for: .normal)
+
+        helpButton.addAction(
+            UIAction { [weak self] _ in
+                let tutorialView = TutorialViewController()
+                tutorialView.hidesBottomBarWhenPushed = true
+                self?.navigationController?.pushViewController(tutorialView, animated: true)
+            },
+            for: .touchUpInside)
 
         let homeLabelText = "\(nickname)\n"
         homeLabel.attributedText = BitnagilFont(
@@ -615,9 +623,11 @@ final class HomeViewController: BaseViewController<HomeViewModel> {
         guard let emotionRegisterViewModel = DIContainer.shared.resolve(type: EmotionRegisterViewModel.self) else {
             fatalError("emotionRegisterViewModel 의존성이 등록되지 않았습니다.")
         }
-        let emotionRegisterView = EmotionRegisterView(viewModel: emotionRegisterViewModel)
-        emotionRegisterView.hidesBottomBarWhenPushed = true
-        navigationController?.pushViewController(emotionRegisterView, animated: true)
+
+        let emotionRegistrationViewController = EmotionRegistrationViewController(viewModel: emotionRegisterViewModel)
+
+        emotionRegistrationViewController.hidesBottomBarWhenPushed = true
+        navigationController?.pushViewController(emotionRegistrationViewController, animated: true)
     }
 }
 
@@ -654,6 +664,18 @@ extension HomeViewController: RoutineViewDelegate {
 
 // MARK: FloatingMenuViewDelegate
 extension HomeViewController: FloatingMenuViewDelegate {
+    func floatingMenuDidTapReportButton(_ sender: FloatingMenuView) {
+        toggleFloatingButton()
+
+        guard let reportRegistrationViewModel = DIContainer.shared.resolve(type: ReportRegistrationViewModel.self)
+        else { fatalError("reportRegistrationViewController 의존성이 등록되지 않았습니다.") }
+
+        let reportRegistrationViewController = ReportRegistrationViewController(viewModel: reportRegistrationViewModel)
+        reportRegistrationViewController.hidesBottomBarWhenPushed = true
+
+        self.navigationController?.pushViewController(reportRegistrationViewController, animated: true)
+    }
+    
     func floatingMenuDidTapRegisterRoutineButton(_ sender: FloatingMenuView) {
         toggleFloatingButton()
         guard let routineCreationViewModel = DIContainer.shared.resolve(type: RoutineCreationViewModel.self) else {
