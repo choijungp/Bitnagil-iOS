@@ -13,6 +13,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Cache Tuist & Mise
+        uses: actions/cache@v3
+        with:
+          path:  |
+            ~/.tuist
+            ~/.local/bin/tuist
+            ~/.local/share/mise
+          key: tuist-mise-${{ runner.os }}-${{ hashFiles('**/Project.swift', '**/Tuist/*') }}
+
+      - name: Cache Swift Package Manager
+        uses: actions/cache@v3
+        with:
+          path:  |
+            ~/.swiftpm
+            ~/Library/Developer/Xcode/DerivedData
+          key: spm-${{ runner.os }}-${{ hashFiles('**/Package.resolved') }}
+        
       - name: Set Xcode version
         run: sudo xcode-select -s /Applications/Xcode_16.4.app
 
@@ -43,6 +60,6 @@ jobs:
             -workspace Bitnagil.xcworkspace \
             -scheme App \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=18.4' \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.4' \
             clean build | xcpretty
 
